@@ -1,2 +1,2 @@
 # notes2flash
-GenAI application to automatically organize notes written in a googledoc and transform them into Anki flashcards
+AI-powered application to organize Google Doc notes and convert them into Anki flashcards.
