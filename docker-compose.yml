@@ -1,5 +1,54 @@
 version: '3'
 services:
+  # 0) docker service to run anki
+  anki-desktop:
+    build:
+      context: ./anki-desktop-docker 
+      dockerfile: Dockerfile
+    volumes:
+      - ./anki_config:/config/app/Anki2
+      - ./anki_backups:/config/app/backups
+    ports:
+      - 3000:3000   # Anki GUI accessible via browser
+      - 8765:8765   # AnkiConnect API
+
+  # Service 1: Google Docs Scraper
+  google-docs-scraper:
+    build:
+      context: ./google-docs-scraper
+    container_name: googledoc_scraper
+    environment:
+      - GOOGLE_DOC_ID=1TE2tqPhoUYYpx8xA6QPz3B1Ygo1xCex1gtJMa7qfGi0  # The Google Doc ID
+    volumes:
+      - ./output:/app/output  # Save scraped content in shared volume for processing
+
+  # Service 2: Process notes to docs  
+  process-notes:
+    build:
+      context: ./process-notes
+    container_name: process_notes
+    volumes:
+      - ./output:/app/output  # Shared volume for input/output
+    depends_on:
+      - google-docs-scraper
+  
+  # Service 3: Upload processed notes to anki
+  anki-connect:
+    build:
+      context: ./anki-connect
+    container_name: anki_connect
+    environment:
+      - DECK_NAME=test_deck
+      - ANKI_API_URL=http://anki-desktop:8765  # Anki Connect API endpoint
+    volumes:
+      - ./output:/app/output  # Processed content shared from processor
+    depends_on:
+      - process-notes
+      - anki-desktop
+
+
+
+  # for development in jupyter notebooks
   jupyter:
     build:
       context: .
@@ -13,14 +62,6 @@ services:
       - JUPYTER_ENABLE_LAB=yes
     env_file:
       - .env
+    profiles:
+      - jupyter
   
-  anki-desktop:
-    build:
-      context: ./anki-desktop-docker # Assuming you clone the repo in this subfolder
-      dockerfile: Dockerfile
-    volumes:
-      - ~/.local/share/Anki2:/config/app/Anki2
-      - ~/backups:/config/app/backups
-    ports:
-      - 3000:3000   # Anki GUI accessible via browser
-      - 8765:8765   # AnkiConnect API
