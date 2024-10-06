@@ -1,15 +1,26 @@
 version: '3'
 services:
   jupyter:
-      build:
-        context: .
-        dockerfile: Dockerfile.jupyter
-      container_name: cards2flash_jupyter
-      ports:
-        - "8888:8888"
-      volumes:
-        - .:/home/jovyan/app
-      environment:
-        - JUPYTER_ENABLE_LAB=yes
-      env_file:
-            - .env
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: cards2flash_jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/home/jovyan/app
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    env_file:
+      - .env
+  
+  anki-desktop:
+    build:
+      context: ./anki-desktop-docker # Assuming you clone the repo in this subfolder
+      dockerfile: Dockerfile
+    volumes:
+      - ~/.local/share/Anki2:/config/app/Anki2
+      - ~/backups:/config/app/backups
+    ports:
+      - 3000:3000   # Anki GUI accessible via browser
+      - 8765:8765   # AnkiConnect API
