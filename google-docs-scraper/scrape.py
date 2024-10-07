@@ -50,3 +50,6 @@ if __name__ == '__main__':
     with open(output_file, 'w') as file:
         file.write(doc_text)
     print(f"Google Doc content saved to {output_file}")
+    # create tmp file so processing can start
+    with open('/app/output/scraping.done', 'w') as f:
+        f.write('Scraping completed.')

@@ -12,6 +12,7 @@ services:
       - 3000:3000   # Anki GUI accessible via browser
       - 8765:8765   # AnkiConnect API
 
+
   # Service 1: Google Docs Scraper
   google-docs-scraper:
     build:
@@ -21,6 +22,8 @@ services:
       - GOOGLE_DOC_ID=1TE2tqPhoUYYpx8xA6QPz3B1Ygo1xCex1gtJMa7qfGi0  # The Google Doc ID
     volumes:
       - ./output:/app/output  # Save scraped content in shared volume for processing
+    depends_on:
+      - anki-desktop
 
   # Service 2: Process notes to docs  
   process-notes:
@@ -31,6 +34,7 @@ services:
       - ./output:/app/output  # Shared volume for input/output
     depends_on:
       - google-docs-scraper
+
   
   # Service 3: Upload processed notes to anki
   anki-connect:
@@ -45,8 +49,6 @@ services:
     depends_on:
       - process-notes
       - anki-desktop
-
-
 
   # for development in jupyter notebooks
   jupyter:

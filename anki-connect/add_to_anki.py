@@ -1,11 +1,29 @@
 import csv
 import requests
 import os
+import time
 
-ANKI_CONNECT_URL = os.getenv("ANKI_API_URL")
+ANKI_CONNECT_URL = os.getenv("ANKI_API_URL", "http://anki-desktop:8765")
 DECK_NAME = os.getenv("ANKI_DECK_NAME", "test_deck")
 PROCESSED_FILE = "/app/output/processed_content.txt"
 
+def wait_for_file(file_path):
+    """Wait for a specific file to be created."""
+    while not os.path.exists(file_path):
+        print(f"Waiting for {file_path} to be created...")
+        time.sleep(1)
+
+def wait_for_anki():
+    """Wait for the Anki Connect API to be available."""
+    while True:
+        try:
+            response = requests.get(ANKI_CONNECT_URL)
+            if response.status_code == 200:
+                print(f"Anki Connect API is ready at {ANKI_CONNECT_URL}.")
+                break
+        except requests.exceptions.RequestException:
+            print("Waiting for Anki Connect API to be available...")
+        time.sleep(1)
 
 def invoke(action, params):
     """Helper function to interact with Anki Connect API."""
@@ -57,8 +75,17 @@ def process_and_add_notes(file_path, deck_name):
             add_note_to_deck(deck_name, front, back)
 
 if __name__ == '__main__':
+    # Wait for processing to be done
+    wait_for_file('/app/output/processing.done')
+
+    # Wait for the Anki Connect API to be available
+    wait_for_anki()
+
     # Check or create the deck
     check_or_create_deck(DECK_NAME)
 
     # Add notes from the processed content CSV file
     process_and_add_notes(PROCESSED_FILE, DECK_NAME)
+
+    # After uploading notes, delete the done file
+    os.remove('/app/output/processing.done')
