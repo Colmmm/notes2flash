@@ -11,6 +11,9 @@ services:
     ports:
       - 3000:3000   # Anki GUI accessible via browser
       - 8765:8765   # AnkiConnect API
+    profiles:
+      - anki
+      - all
 
 
   # Service 1: Google Docs Scraper
@@ -24,6 +27,9 @@ services:
       - ./output:/app/output  # Save scraped content in shared volume for processing
     depends_on:
       - anki-desktop
+    profiles:
+      - googledoc
+      - all
 
   # Service 2: Process notes to docs  
   process-notes:
@@ -34,6 +40,9 @@ services:
       - ./output:/app/output  # Shared volume for input/output
     depends_on:
       - google-docs-scraper
+    profiles:
+      - process
+      - all
 
   
   # Service 3: Upload processed notes to anki
@@ -49,6 +58,9 @@ services:
     depends_on:
       - process-notes
       - anki-desktop
+    profiles:
+      - ankiconnect
+      - all
 
   # for development in jupyter notebooks
   jupyter:
