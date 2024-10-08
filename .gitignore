@@ -3,3 +3,4 @@ google-docs-scraper/service_account.json
 anki_config
 anki_backups
 output
+.env
