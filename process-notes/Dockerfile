@@ -3,8 +3,8 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Placeholder for future ML libraries
-#RUN pip install --no-cache-dir some-ml-library
+# Install required libraries
+RUN pip install --no-cache-dir requests
 
 # Copy the content processor script
 COPY process_notes.py .

@@ -43,6 +43,8 @@ services:
     profiles:
       - process
       - all
+    env_file:
+      - .env
 
   
   # Service 3: Upload processed notes to anki

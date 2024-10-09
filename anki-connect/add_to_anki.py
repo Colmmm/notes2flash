@@ -68,10 +68,12 @@ def process_and_add_notes(file_path, deck_name):
     with open(file_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)
         for row in reader:
-            if len(row) != 2:
+            if len(row) != 3:
                 print(f"Skipping invalid row: {row}")
                 continue
-            front, back = row
+            mandarin, pinyin, english = row
+            front = mandarin
+            back = f"{pinyin}\n{english}"  # Concatenate Pinyin and English for the back of the card
             add_note_to_deck(deck_name, front, back)
 
 if __name__ == '__main__':
