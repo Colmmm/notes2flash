@@ -1,5 +1,5 @@
-notebooks/.ipynb_checkpoints/
-google-docs-scraper/service_account.json
+.ipynb_checkpoints
+service_account.json
 anki_config
 anki_backups
 output

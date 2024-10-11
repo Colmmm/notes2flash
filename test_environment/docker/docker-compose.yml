@@ -1,6 +1,6 @@
 version: '3'
 services:
-  # 0) docker service to run anki
+  # docker service to run anki for development
   anki-desktop:
     build:
       context: ./anki-desktop-docker 
@@ -8,28 +8,31 @@ services:
     volumes:
       - ./anki_config:/config/app/Anki2
       - ./anki_backups:/config/app/backups
+
+      
     ports:
       - 3000:3000   # Anki GUI accessible via browser
       - 8765:8765   # AnkiConnect API
     profiles:
       - anki
-      - all
-
+    env_file:
+      - .env
 
   # Service 1: Google Docs Scraper
   google-docs-scraper:
     build:
       context: ./google-docs-scraper
     container_name: googledoc_scraper
-    environment:
-      - GOOGLE_DOC_ID=1TE2tqPhoUYYpx8xA6QPz3B1Ygo1xCex1gtJMa7qfGi0  # The Google Doc ID
     volumes:
       - ./output:/app/output  # Save scraped content in shared volume for processing
     depends_on:
       - anki-desktop
     profiles:
       - googledoc
-      - all
+      - cards2flash
+    env_file:
+      - .env
+      - user_inputs.env  
 
   # Service 2: Process notes to docs  
   process-notes:
@@ -42,18 +45,17 @@ services:
       - google-docs-scraper
     profiles:
       - process
-      - all
+      - cards2flash
     env_file:
       - .env
+      - user_inputs.env  
 
-  
   # Service 3: Upload processed notes to anki
   anki-connect:
     build:
       context: ./anki-connect
     container_name: anki_connect
     environment:
-      - DECK_NAME=test_deck
       - ANKI_API_URL=http://anki-desktop:8765  # Anki Connect API endpoint
     volumes:
       - ./output:/app/output  # Processed content shared from processor
@@ -62,9 +64,12 @@ services:
       - anki-desktop
     profiles:
       - ankiconnect
-      - all
+      - cards2flash
+    env_file:
+      - .env
+      - user_inputs.env  
 
-  # for development in jupyter notebooks
+  # for sandboxing development in jupyter notebooks
   jupyter:
     build:
       context: .

@@ -1,0 +1,10 @@
+{
+  "name": "Notes2Flash",
+  "mod": 0,
+  "conflicts": [],
+  "disabled": false,
+  "version": "1.0.0",
+  "author": "Colm Sam",
+  "description": "AI-powered application to organize Google Doc notes and convert them into Anki flashcards.",
+  "target_version": "2.1.50"  
+}

@@ -1,3 +1,0 @@
-[submodule "anki-desktop-docker"]
-	path = anki-desktop-docker
-	url = git@github.com:Colmmm/anki-desktop-docker.git
