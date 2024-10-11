@@ -1,4 +1,4 @@
-# scripts/process_content.py
+# process_notes_to_cards.py
 import os
 import time
 import requests
@@ -6,12 +6,6 @@ import json
 
 # Load API key from environment variable
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-def wait_for_file(file_path):
-    """Wait for a specific file to be created."""
-    while not os.path.exists(file_path):
-        print(f"Waiting for {file_path} to be created...")
-        time.sleep(1)
 
 def organize_and_translate_notes_with_pinyin(notes, prompt):
     """Send a request to the OpenRouter API for processing notes."""
@@ -48,10 +42,8 @@ def organize_and_translate_notes_with_pinyin(notes, prompt):
         return None
 
 # Placeholder processing script
-def process_content(input_file, output_file):
+def process_notes_to_cards(notes):
     """Read Mandarin notes, call OpenRouter API, and save the processed content."""
-    with open(input_file, 'r') as f:
-        notes = f.read()
     
     # Define the prompt for OpenRouter
     prompt = (
@@ -66,28 +58,6 @@ def process_content(input_file, output_file):
 ) 
 
     # Call the OpenRouter API to process the content
-    processed_content = organize_and_translate_notes_with_pinyin(notes, prompt)
-    
-    # Save the processed content to the output file
-    if processed_content:
-        with open(output_file, 'w') as f:
-            f.write(processed_content)
-        print(f"Processed content saved to {output_file}")
-    else:
-        print("Processing failed. No content saved.")
+    cards = organize_and_translate_notes_with_pinyin(notes, prompt)
 
-if __name__ == "__main__":
-    # Wait for the scraping to be done
-    wait_for_file('/app/output/scraping.done')
-
-    # Processing
-    input_file = "/app/output/scraped_content.txt"
-    output_file = "/app/output/processed_content.txt"
-    process_content(input_file, output_file)
-
-    # After processing, delete the done file
-    os.remove('/app/output/scraping.done')
-
-    # Indicate that processing is complete
-    with open('/app/output/processing.done', 'w') as f:
-        f.write('Processing completed.')
+    return cards    

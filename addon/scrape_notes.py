@@ -1,4 +1,4 @@
-# scripts/google_docs_scraper.py
+# scrape_notes.py
 import os
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -37,19 +37,15 @@ def extract_text_from_doc(doc):
     
     return ''.join(text)
 
-# Main execution
-if __name__ == '__main__':
-    if not GOOGLE_DOC_ID:
-        raise ValueError("Google Doc ID not provided. Set GOOGLE_DOC_ID env variable.")
-    
-    doc_content = fetch_google_doc_content(GOOGLE_DOC_ID)
-    doc_text = extract_text_from_doc(doc_content)
-    
-    # Save output to file for processing
-    output_file = '/app/output/scraped_content.txt'
-    with open(output_file, 'w') as file:
-        file.write(doc_text)
-    print(f"Google Doc content saved to {output_file}")
-    # create tmp file so processing can start
-    with open('/app/output/scraping.done', 'w') as f:
-        f.write('Scraping completed.')
+def scrape_notes(doc_id):
+    if not doc_id:
+        raise ValueError("Google Doc ID not provided.")
+    try:
+        doc_content = fetch_google_doc_content(GOOGLE_DOC_ID)
+        doc_text = extract_text_from_doc(doc_content)
+        return doc_text
+    except Exception as e:
+            print(f"An unexpected error occurred: {str(e)}")
+        
+
+
