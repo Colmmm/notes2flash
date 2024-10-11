@@ -4,7 +4,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # Path to the service account key file (use ENV var for flexibility)
-SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', '/app/service_account.json')
+SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'service_account.json')
 GOOGLE_DOC_ID = os.getenv('GOOGLE_DOC_ID')
 
 # Define the scope

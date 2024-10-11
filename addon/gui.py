@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton
 from aqt.utils import showInfo
+from .notes2flash import notes2flash
 import subprocess
 
 class CustomInputDialog(QDialog):
@@ -42,27 +43,7 @@ class CustomInputDialog(QDialog):
         # Show info with the provided inputs
         showInfo(f"Google Doc ID: {google_doc_id}\nDeck Name: {deck_name}")
         
-        # Call backend function to start the Docker process
-        self.start_docker_process(google_doc_id, deck_name)
+        # Call backend function to start notes2flash
+        notes2flash(google_doc_id, deck_name)
 
-    def start_docker_process(self, google_doc_id, deck_name):
-        """
-        Function to trigger the docker processes using the provided Google Doc ID and deck name.
-        """
-        try:
-            # Create a custom env file with user inputs
-            with open('user_inputs.env', 'w') as f:
-                f.write(f'GOOGLE_DOC_ID={google_doc_id}\n')
-                f.write(f'DECK_NAME={deck_name}\n')
-
-            # Start the docker services
-            subprocess.run(['docker-compose', 
-                            '--env-file user_inputs.env',
-                            'up', '-d', 'google-docs-scraper', 'process-notes', 'anki-connect'], check=True)
-
-        except subprocess.CalledProcessError as e:
-            showInfo(f"Error running Docker: {e}")
-
-        except Exception as e:
-            showInfo(f"An unexpected error occurred: {str(e)}")
 
