@@ -1,88 +1,37 @@
 version: '3'
 services:
-  # docker service to run anki for development
+  # Docker service to copy the anki_config directory and the addon directory into the Anki container
+  copy-anki-config:
+    image: alpine:latest
+    working_dir: /app
+    volumes:
+      - ../anki_config:/app/anki_config  # Relative path to anki_config
+      - ../../addon:/app/addon  # Relative path to the addon directory
+      - anki_data:/config
+    command: sh -c "
+      mkdir -p /config/app/Anki2/User\ 1/backups /config/app/Anki2/addons21/notes2flash_addon &&  
+      echo 'Checking files in /app/anki_config:' && ls -l /app/anki_config &&  
+      echo 'Checking files in /app/addon:' && ls -l /app/addon &&  
+      cp -r /app/anki_config/* /config/app/Anki2/ && 
+      cp -r /app/addon/* /config/app/Anki2/addons21/notes2flash_addon/ && 
+      echo 'Files copied successfully'"
+
+
+  # Docker service to run Anki for development
   anki-desktop:
     build:
-      context: ./anki-desktop-docker 
-      dockerfile: Dockerfile
+      context: .  # Set the build context to the current directory
+      dockerfile: Dockerfile.anki
     volumes:
-      - ./anki_config:/config/app/Anki2
-      - ./anki_backups:/config/app/backups
-
-      
+      - anki_data:/config/app/Anki2
+      - ../anki_backups:/config/app/backups  # Relative path to anki_backups
     ports:
-      - 3000:3000   # Anki GUI accessible via browser
-      - 8765:8765   # AnkiConnect API
-    profiles:
-      - anki
-    env_file:
-      - .env
-
-  # Service 1: Google Docs Scraper
-  google-docs-scraper:
-    build:
-      context: ./google-docs-scraper
-    container_name: googledoc_scraper
-    volumes:
-      - ./output:/app/output  # Save scraped content in shared volume for processing
+      - 3000:3000
+      - 8765:8765
     depends_on:
-      - anki-desktop
-    profiles:
-      - googledoc
-      - cards2flash
-    env_file:
-      - .env
-      - user_inputs.env  
+      - copy-anki-config
 
-  # Service 2: Process notes to docs  
-  process-notes:
-    build:
-      context: ./process-notes
-    container_name: process_notes
-    volumes:
-      - ./output:/app/output  # Shared volume for input/output
-    depends_on:
-      - google-docs-scraper
-    profiles:
-      - process
-      - cards2flash
-    env_file:
-      - .env
-      - user_inputs.env  
+volumes:
+  anki_data:
 
-  # Service 3: Upload processed notes to anki
-  anki-connect:
-    build:
-      context: ./anki-connect
-    container_name: anki_connect
-    environment:
-      - ANKI_API_URL=http://anki-desktop:8765  # Anki Connect API endpoint
-    volumes:
-      - ./output:/app/output  # Processed content shared from processor
-    depends_on:
-      - process-notes
-      - anki-desktop
-    profiles:
-      - ankiconnect
-      - cards2flash
-    env_file:
-      - .env
-      - user_inputs.env  
 
-  # for sandboxing development in jupyter notebooks
-  jupyter:
-    build:
-      context: .
-      dockerfile: Dockerfile.jupyter
-    container_name: cards2flash_jupyter
-    ports:
-      - "8888:8888"
-    volumes:
-      - .:/home/jovyan/app
-    environment:
-      - JUPYTER_ENABLE_LAB=yes
-    env_file:
-      - .env
-    profiles:
-      - jupyter
-  
