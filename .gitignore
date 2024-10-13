@@ -4,3 +4,5 @@ anki_config
 anki_backups
 output
 .env
+*.zip
+libs/

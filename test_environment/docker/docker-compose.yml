@@ -1,21 +1,32 @@
 version: '3'
 services:
-  # Docker service to copy the anki_config directory and the addon directory into the Anki container
+  # Docker service to bundle the addon with dependencies
+  bundle-addon:
+    image: python:3.9-slim  # Use a lightweight Python image with pip preinstalled
+    volumes:
+      - ../../addon:/addon  # Mount unbundled addon to /addon_unbundled
+    working_dir: /addon  # Set working directory to the unbundled addon folder
+    command: sh -c "
+      python bundle_addon.py && 
+      cp -r /addon/. /addon/ &&  
+      echo 'Addon bundled and copied successfully'"
+    profiles:
+      - bundle
+
+  # Docker service to copy the bundled addon and anki_config into the Anki container
   copy-anki-config:
     image: alpine:latest
-    working_dir: /app
     volumes:
-      - ../anki_config:/app/anki_config  # Relative path to anki_config
-      - ../../addon:/app/addon  # Relative path to the addon directory
-      - anki_data:/config
+      - ../anki_config:/anki_config  # Relative path to anki_config
+      - ../../addon:/addon  # Shared volume for the bundled addon
+      - docker_volume_Anki2:/Anki2
     command: sh -c "
-      mkdir -p /config/app/Anki2/User\ 1/backups /config/app/Anki2/addons21/notes2flash_addon &&  
-      echo 'Checking files in /app/anki_config:' && ls -l /app/anki_config &&  
-      echo 'Checking files in /app/addon:' && ls -l /app/addon &&  
-      cp -r /app/anki_config/* /config/app/Anki2/ && 
-      cp -r /app/addon/* /config/app/Anki2/addons21/notes2flash_addon/ && 
+      cp -r /anki_config/* /Anki2/ && 
+      cp -r /addon/. /Anki2/addons21/notes2flash_addon/ && 
+      chown -R 1000:1000 /Anki2 &&
       echo 'Files copied successfully'"
-
+    profiles:
+      - run 
 
   # Docker service to run Anki for development
   anki-desktop:
@@ -23,15 +34,15 @@ services:
       context: .  # Set the build context to the current directory
       dockerfile: Dockerfile.anki
     volumes:
-      - anki_data:/config/app/Anki2
+      - docker_volume_Anki2:/config/app/Anki2
       - ../anki_backups:/config/app/backups  # Relative path to anki_backups
     ports:
       - 3000:3000
       - 8765:8765
     depends_on:
-      - copy-anki-config
+      - copy-anki-config  # Start Anki only after config and addon are copied
+    profiles:
+      - run 
 
 volumes:
-  anki_data:
-
-
+  docker_volume_Anki2:

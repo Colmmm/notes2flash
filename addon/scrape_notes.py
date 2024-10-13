@@ -1,10 +1,20 @@
 # scrape_notes.py
 import os
+import sys
+
+# Add the path to the `libs` directory where extra packages are bundled
+addon_folder = os.path.dirname(__file__)
+libs_path = os.path.join(addon_folder, "libs")
+if libs_path not in sys.path:
+    sys.path.insert(0, libs_path)
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+
 # Path to the service account key file (use ENV var for flexibility)
-SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', 'service_account.json')
+current_dir = os.path.dirname(__file__)
+SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json") 
 GOOGLE_DOC_ID = os.getenv('GOOGLE_DOC_ID')
 
 # Define the scope
@@ -41,7 +51,7 @@ def scrape_notes(doc_id):
     if not doc_id:
         raise ValueError("Google Doc ID not provided.")
     try:
-        doc_content = fetch_google_doc_content(GOOGLE_DOC_ID)
+        doc_content = fetch_google_doc_content(doc_id)
         doc_text = extract_text_from_doc(doc_content)
         return doc_text
     except Exception as e:

@@ -1,12 +1,12 @@
 from aqt import mw
 from aqt.utils import showInfo
-from PyQt6.QtWidgets import QAction
+from aqt.qt import QAction
 from .gui import CustomInputDialog
 
 def open_input_dialog():
     """Function to open the custom input dialog."""
     dialog = CustomInputDialog()
-    dialog.exec_()
+    dialog.exec()
 
 def setup_menu():
     """Add the custom flashcard generator to Anki's Tools menu."""

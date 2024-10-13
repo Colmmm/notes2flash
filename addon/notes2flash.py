@@ -1,7 +1,7 @@
 # notes2flash.py
-from addon.scrape_notes import scrape_notes
-from addon.process_notes_to_cards import process_notes_to_cards
-from addon.add_cards_to_anki import add_cards_to_anki
+from .scrape_notes import scrape_notes
+from .process_notes_to_cards import process_notes_to_cards
+from .add_cards_to_anki import add_cards_to_anki
 
 def notes2flash(doc_id, deck_name):
     try:
