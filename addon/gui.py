@@ -31,19 +31,31 @@ class CustomInputDialog(QDialog):
         # Set layout to dialog
         self.setLayout(layout)
 
+    
     def submit_data(self):
         google_doc_id = self.google_doc_input.text()
         deck_name = self.deck_name_input.text()
-        
+
+        print("Submit button clicked.")  # Debug statement
+    
         # Validate inputs
         if not google_doc_id or not deck_name:
             showInfo("Both fields are required.")
+            print("Validation failed: Missing Google Doc ID or Deck Name.")  # Debug statement
             return
-        
+
         # Show info with the provided inputs
         showInfo(f"Google Doc ID: {google_doc_id}\nDeck Name: {deck_name}")
-        
-        # Call backend function to start notes2flash
-        notes2flash(google_doc_id, deck_name)
+        print(f"Google Doc ID: {google_doc_id}, Deck Name: {deck_name}")  # Debug statement
+    
+        try:
+            # Call backend function to start notes2flash
+            print("Calling notes2flash function...")  # Debug statement
+            notes2flash(google_doc_id, deck_name)
+            print("notes2flash function executed.")  # Debug statement
+        except Exception as e:
+            showInfo(f"Error occurred: {e}")
+            print(f"Error occurred during notes2flash execution: {e}")
+
 
 

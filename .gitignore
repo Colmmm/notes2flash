@@ -6,3 +6,4 @@ output
 .env
 *.zip
 libs/
+Anki*
