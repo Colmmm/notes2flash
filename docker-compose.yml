@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  addon_bundler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.9}
+    volumes:
+      - ./addon:/app/addon
+      - ./requirements.txt:/app/requirements.txt
+      - ./output:/app/output
+    environment:
+      - PYTHON_VERSION=${PYTHON_VERSION:-3.9}
+    command: sh -c "python addon/bundle_addon.py && cp notes2flash.ankiaddon /app/output/"
