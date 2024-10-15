@@ -1,2 +1,9 @@
-notebooks/.ipynb_checkpoints/
+.ipynb_checkpoints
 service_account.json
+anki_config
+anki_backups
+output
+.env
+*.zip
+libs/
+Anki*
