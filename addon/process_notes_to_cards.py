@@ -1,16 +1,23 @@
 # process_notes_to_cards.py
-import os
 import time
 import requests
 import json
+from aqt import mw
 
-# Load API key from environment variable
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+def get_config():
+    return mw.addonManager.getConfig(__name__)
 
 def organize_and_translate_notes_with_pinyin(notes, prompt):
     """Send a request to the OpenRouter API for processing notes."""
     url = "https://openrouter.ai/api/v1/chat/completions"
     
+    # Get the API key from the config
+    config = get_config()
+    OPENROUTER_API_KEY = config.get('openrouter_api_key', '')
+
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OpenRouter API key is not set in the config.")
+
     # Define the data payload for the API request
     data = {
         "model": "meta-llama/llama-3.1-8b-instruct:free",
@@ -60,4 +67,4 @@ def process_notes_to_cards(notes):
     # Call the OpenRouter API to process the content
     cards = organize_and_translate_notes_with_pinyin(notes, prompt)
 
-    return cards    
+    return cards
