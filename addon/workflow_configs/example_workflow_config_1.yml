@@ -1,0 +1,46 @@
+workflow_name: "Vocabulary Extraction and Translation"
+
+stages: ["scrape_notes", "process_notes_to_cards", "add_cards_to_anki"]
+user_inputs: [google_doc_id, openrouter_api_key, target_language]
+
+scrape_notes:
+  doc_id: "{google_doc_id}"
+
+process_notes_to_cards:
+  api_key: "{openrouter_api_key}"
+  steps:
+    - name: "Extract Vocabulary"
+      prompt: "Extract vocabulary from the following content: {notes_content}"
+      input:
+        - notes_content
+      output: vocabulary_list
+      model: "meta-llama/llama-3.1-8b-instruct:free"
+
+    - name: "Translate Vocabulary"
+      prompt: "Translate the following vocabulary: {vocabulary_list} to {target_language}"
+      input:
+        - vocabulary_list
+        - target_language
+      output: translated_vocabulary
+      model: "meta-llama/llama-3.1-8b-instruct:free"
+
+    - name: "Generate Flashcards"
+      prompt: |
+        Create flashcards using this vocabulary: {vocabulary_list} and the following translations {translated_vocabulary} into the following format:
+        [
+          {"vocab": "vocab1", "translation": "translation1"},
+          {"vocab": "vocab2", "translation": "translation2"},
+          ...
+        ]
+      input:
+        - vocabulary_list
+        - translated_vocabulary
+      output: flashcards
+      model: "meta-llama/llama-3.1-8b-instruct:free"
+
+add_cards_to_anki:
+  deck_name: "Vocabulary Deck"
+  card_template:
+    template_name: "Basic"
+    front: "{vocab}"
+    back: "{translation}"

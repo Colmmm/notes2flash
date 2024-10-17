@@ -1,5 +1,4 @@
-import csv
-from io import StringIO
+import json
 from aqt import mw
 from anki.notes import Note
 
@@ -18,50 +17,70 @@ def check_or_create_deck(deck_name):
 
     return deck_id
 
-def add_note_to_deck(deck_name, front, back):
+def add_note_to_deck(deck_name, model_name, fields):
     """Add a new note (flashcard) to the specified deck."""
-    print(f"Adding note to deck '{deck_name}': Front - '{front}', Back - '{back}'")
+    print(f"Adding note to deck '{deck_name}': Fields - {fields}")
 
     # Get the deck ID and model for the note
     deck_id = check_or_create_deck(deck_name)
-    model = mw.col.models.byName("Basic")  # Assuming you're using the Basic model
+    model = mw.col.models.byName(model_name)
+
+    if not model:
+        raise ValueError(f"Model '{model_name}' not found in Anki.")
 
     # Create a new note
     note = Note(mw.col, model)
-    note.fields[0] = front  # Front field
-    note.fields[1] = back   # Back field
+    
+    # Set the fields of the note
+    for i, (field_name, field_value) in enumerate(fields.items()):
+        if i < len(note.fields):
+            note.fields[i] = field_value
+        else:
+            print(f"Warning: Field '{field_name}' not found in the note model.")
     
     # Set the deck ID for the note
     note.model()['did'] = deck_id
 
     # Add the note to the collection
     if mw.col.addNote(note):
-        print(f"Note added to deck '{deck_name}': Front - '{front}', Back - '{back}'")
+        print(f"Note added to deck '{deck_name}': Fields - {fields}")
     else:
         print(f"Failed to add note to deck '{deck_name}'.")
 
-def add_cards_to_anki(content, deck_name):
-    """Process the CSV content and add each front/back pair as a note."""
-    print(f"Starting to add cards to deck '{deck_name}'...")
+def add_cards_to_anki(stage_data, stage_config):
+    """Process the stage data and add cards to Anki based on the configuration."""
+    print("Starting to add cards to Anki...")
+
+    deck_name = stage_config.get('deck_name', 'Default')
+    card_template = stage_config.get('card_template', {})
+    template_name = card_template.get('template_name', 'Basic')
 
     # Ensure the deck exists
     check_or_create_deck(deck_name)
 
-    # Parse the CSV content
-    reader = csv.reader(StringIO(content))
+    # Get the flashcards data
+    flashcards_data = stage_data.get('flashcards', '[]')
+    
+    try:
+        flashcards = json.loads(flashcards_data)
+    except json.JSONDecodeError:
+        print(f"Error: Invalid JSON data in flashcards: {flashcards_data}")
+        return
 
-    # Process each row and add the notes to the deck
-    for row in reader:
-        print(f"Processing row: {row}")
-        if len(row) != 3:
-            print(f"Skipping invalid row: {row}")
-            continue
+    cards_added = 0
+    # Process each flashcard and add it to the deck
+    for card_data in flashcards:
+        fields = {}
+        for field, template in card_template.items():
+            if field != 'template_name':
+                fields[field] = template.format(**card_data)
+        
+        try:
+            add_note_to_deck(deck_name, template_name, fields)
+            cards_added += 1
+        except ValueError as e:
+            print(f"Error adding card: {e}")
 
-        mandarin, pinyin, english = row
-        front = mandarin
-        back = f"{pinyin}\n{english}"  # Concatenate Pinyin and English for the back of the card
-        add_note_to_deck(deck_name, front, back)
+    print(f"Finished adding cards to Anki. {cards_added} cards added.")
 
-    print("Finished adding cards to Anki.")
-
-
+    return {"cards_added": cards_added}

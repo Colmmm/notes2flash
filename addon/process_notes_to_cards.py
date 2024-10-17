@@ -1,27 +1,21 @@
 # process_notes_to_cards.py
-import time
 import requests
 import json
-from aqt import mw
 
-def get_config():
-    return mw.addonManager.getConfig(__name__)
-
-def organize_and_translate_notes_with_pinyin(notes, prompt):
+def call_openrouter_api(prompt, api_key, model, input_data):
     """Send a request to the OpenRouter API for processing notes."""
     url = "https://openrouter.ai/api/v1/chat/completions"
     
-    # Get the API key from the config
-    config = get_config()
-    OPENROUTER_API_KEY = config.get('openrouter_api_key', '')
+    if not api_key:
+        raise ValueError("OpenRouter API key is not provided in the stage_config.")
 
-    if not OPENROUTER_API_KEY:
-        raise ValueError("OpenRouter API key is not set in the config.")
+    # Format the prompt with input data
+    formatted_prompt = prompt.format(**input_data)
 
     # Define the data payload for the API request
     data = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
-        "messages": [{"role": "user", "content": prompt}],
+        "model": model,
+        "messages": [{"role": "user", "content": formatted_prompt}],
         "top_p": 1,
         "temperature": 0.8,
         "frequency_penalty": 0,
@@ -34,7 +28,7 @@ def organize_and_translate_notes_with_pinyin(notes, prompt):
     response = requests.post(
         url=url,
         headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         },
         data=json.dumps(data)
@@ -43,28 +37,46 @@ def organize_and_translate_notes_with_pinyin(notes, prompt):
     # Handle the response and return the content
     if response.status_code == 200:
         result = response.json()
-        return result['choices'][0]['message']['content'].strip()  # Extract the AI-generated text (CSV output)
+        return result['choices'][0]['message']['content'].strip()
     else:
         print(f"Error: {response.status_code}, {response.text}")
         return None
 
-# Placeholder processing script
-def process_notes_to_cards(notes):
-    """Read Mandarin notes, call OpenRouter API, and save the processed content."""
+def process_notes_to_cards(stage_data, stage_config):
+    """Process notes to cards using the provided multi-step configuration."""
+    api_key = stage_config.get('api_key', '')
+    steps = stage_config.get('steps', [])
     
-    # Define the prompt for OpenRouter
-    prompt = (
-    f"You are given a list of Mandarin vocabulary: {notes}. "
-    "Your task is to clean and process the notes and extract each vocabulary word for mandarin revision, provide the English translation, and its pinyin. "
-    "Format the output as a CSV where each row represents a flashcard. "
-    "The first column should contain the Mandarin word, and the second column should contain the pinyin."
-    "and the third column should contain its English meanings."
-    "Please provide **only** the CSV data without any additional text or explanations. "
-    "The CSV should look like this:\n"
-    "Mandarin,Pinyin,English\n"
-) 
+    # Initialize the data dictionary with the input stage_data
+    data = stage_data.copy()
 
-    # Call the OpenRouter API to process the content
-    cards = organize_and_translate_notes_with_pinyin(notes, prompt)
+    for step in steps:
+        name = step.get('name', 'Unnamed Step')
+        prompt = step.get('prompt', '')
+        model = step.get('model', 'meta-llama/llama-3.1-8b-instruct:free')
+        input_keys = step.get('input', [])
+        output_key = step.get('output', '')
 
-    return cards
+        print(f"Executing step: {name}")
+
+        # Prepare input data for this step
+        step_input = {key: data.get(key, '') for key in input_keys}
+
+        # Call the API
+        result = call_openrouter_api(prompt, api_key, model, step_input)
+
+        # Store the result
+        if result:
+            data[output_key] = result
+        else:
+            print(f"Step '{name}' failed to produce output.")
+
+    # Prepare the final output
+    final_output = {}
+    for key in stage_config.get('final_output_key_names', []):
+        if key in data:
+            final_output[key] = data[key]
+        else:
+            print(f"Warning: Expected output key '{key}' not found in processed data.")
+
+    return final_output

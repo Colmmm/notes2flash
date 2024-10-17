@@ -11,11 +11,9 @@ if libs_path not in sys.path:
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-
 # Path to the service account key file (use ENV var for flexibility)
 current_dir = os.path.dirname(__file__)
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json") 
-GOOGLE_DOC_ID = os.getenv('GOOGLE_DOC_ID')
 
 # Define the scope
 SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
@@ -47,15 +45,14 @@ def extract_text_from_doc(doc):
     
     return ''.join(text)
 
-def scrape_notes(doc_id):
+def scrape_notes(stage_config):
+    doc_id = stage_config.get('doc_id')
     if not doc_id:
-        raise ValueError("Google Doc ID not provided.")
+        raise ValueError("Google Doc ID not provided in stage_config.")
     try:
         doc_content = fetch_google_doc_content(doc_id)
         doc_text = extract_text_from_doc(doc_content)
-        return doc_text
+        return {"notes_content": doc_text}
     except Exception as e:
-            print(f"An unexpected error occurred: {str(e)}")
-        
-
-
+        print(f"An unexpected error occurred: {str(e)}")
+        raise
