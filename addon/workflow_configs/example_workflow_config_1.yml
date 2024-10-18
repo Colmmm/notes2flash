@@ -1,45 +1,62 @@
 workflow_name: "Vocabulary Extraction and Translation"
 
 stages: ["scrape_notes", "process_notes_to_cards", "add_cards_to_anki"]
-user_inputs: [google_doc_id, openrouter_api_key, target_language]
+user_inputs: [google_doc_id, openrouter_api_key, target_language, deckname]
 
+# Step 1: Scrape Notes from Google Docs
 scrape_notes:
   doc_id: "{google_doc_id}"
+  output:
+    name: scraped_notes_output
+    keys:
+      - notes_content
 
+# Step 2: Process Notes into Cards
 process_notes_to_cards:
   api_key: "{openrouter_api_key}"
   steps:
+    # Step 2A: Extract Vocabulary
     - name: "Extract Vocabulary"
-      prompt: "Extract vocabulary from the following content: {notes_content}"
-      input:
-        - notes_content
-      output: vocabulary_list
-      model: "meta-llama/llama-3.1-8b-instruct:free"
-
-    - name: "Translate Vocabulary"
-      prompt: "Translate the following vocabulary: {vocabulary_list} to {target_language}"
-      input:
-        - vocabulary_list
-        - target_language
-      output: translated_vocabulary
-      model: "meta-llama/llama-3.1-8b-instruct:free"
-
-    - name: "Generate Flashcards"
       prompt: |
-        Create flashcards using this vocabulary: {vocabulary_list} and the following translations {translated_vocabulary} into the following format:
-        [
-          {"vocab": "vocab1", "translation": "translation1"},
-          {"vocab": "vocab2", "translation": "translation2"},
-          ...
-        ]
+        Extract vocabulary from the following content: {scraped_notes_output.notes_content}.
+        Output the result as a JSON object in this format:
+        {
+          "vocabulary_list": ["word1", "word2", "word3", ...]
+        }
       input:
-        - vocabulary_list
-        - translated_vocabulary
-      output: flashcards
+        - scraped_notes_output.notes_content
+      output:
+        name: vocabulary_extraction_output  # Name of the output to be referred to in later steps
+        keys:
+          - vocabulary_list
       model: "meta-llama/llama-3.1-8b-instruct:free"
 
+    # Step 2B: Translate Vocabulary and Generate Flashcards
+    - name: "Translate and Generate Flashcards"
+      prompt: |
+        Translate the following vocabulary: {vocabulary_extraction_output.vocabulary_list} into {target_language}. 
+        Then, using the translations, generate flashcards in this format:
+        {
+          "flashcards": [
+            {"vocab": "word1", "translation": "translation1"},
+            {"vocab": "word2", "translation": "translation2"},
+            ...
+          ]
+        }
+      input:
+        - vocabulary_extraction_output.vocabulary_list
+        - target_language
+      output:
+        name: flashcards_output  # Name of the output
+        keys:
+          - flashcards
+      model: "meta-llama/llama-3.1-8b-instruct:free"
+
+# Step 3: Add Cards to Anki
 add_cards_to_anki:
-  deck_name: "Vocabulary Deck"
+  input:
+    - flashcards_output.flashcards
+  deck_name: "{deckname}"
   card_template:
     template_name: "Basic"
     front: "{vocab}"

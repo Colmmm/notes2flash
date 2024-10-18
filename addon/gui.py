@@ -1,4 +1,4 @@
-from aqt.qt import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QComboBox, QMessageBox
+from aqt.qt import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QComboBox, QMessageBox, QCheckBox, QTextEdit
 from aqt import mw
 from aqt.utils import showInfo
 from .notes2flash import notes2flash
@@ -6,6 +6,7 @@ from .workflow_engine import WorkflowEngine
 from aqt.deckbrowser import DeckBrowser
 import os
 import yaml
+import logging
 
 class CustomInputDialog(QDialog):
     def __init__(self, parent=None):
@@ -22,6 +23,10 @@ class CustomInputDialog(QDialog):
         self.populate_workflow_dropdown()
         self.layout.addWidget(self.workflow_dropdown)
         self.workflow_dropdown.currentIndexChanged.connect(self.on_workflow_changed)
+
+        # Debug mode checkbox
+        self.debug_checkbox = QCheckBox("Enable Debug Mode")
+        self.layout.addWidget(self.debug_checkbox)
 
         # Progress label
         self.progress_label = QLabel("Status: Ready")
@@ -62,9 +67,9 @@ class CustomInputDialog(QDialog):
         # Create input fields based on user_inputs in the workflow config
         for input_name in workflow_config.get('user_inputs', []):
             label = QLabel(f"Enter {input_name}:")
-            self.layout.insertWidget(self.layout.count() - 2, label)  # Insert before progress label
+            self.layout.insertWidget(self.layout.count() - 3, label)  # Insert before debug checkbox
             input_field = QLineEdit()
-            self.layout.insertWidget(self.layout.count() - 2, input_field)
+            self.layout.insertWidget(self.layout.count() - 3, input_field)
             self.input_fields[input_name] = input_field
 
     def submit_data(self):
@@ -86,13 +91,18 @@ class CustomInputDialog(QDialog):
 
             # Call backend function to start notes2flash
             self.update_progress("Processing...")
-            result = notes2flash(workflow_config_path, user_inputs, progress_callback=self.update_progress)
+            result = notes2flash(workflow_config_path, user_inputs, progress_callback=self.update_progress, debug=self.debug_checkbox.isChecked())
             self.update_progress("Complete")
             QMessageBox.information(self, "Success", f"Flashcards generated successfully! {result.get('cards_added', 0)} cards added.")
             self.refresh_anki_decks()
             self.accept()  # Close the dialog
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+            error_message = f"An error occurred: {str(e)}"
+            if self.debug_checkbox.isChecked():
+                error_message += "\n\nDebug information:"
+                with open('notes2flash.log', 'r') as log_file:
+                    error_message += "\n" + log_file.read()
+            self.show_error_dialog("Error", error_message)
         finally:
             # Re-enable submit button and restore text
             self.submit_button.setEnabled(True)
@@ -105,6 +115,20 @@ class CustomInputDialog(QDialog):
     def refresh_anki_decks(self):
         mw.deckBrowser.refresh()
         mw.reset()
+
+    def show_error_dialog(self, title, message):
+        error_dialog = QDialog(self)
+        error_dialog.setWindowTitle(title)
+        layout = QVBoxLayout()
+        text_edit = QTextEdit()
+        text_edit.setPlainText(message)
+        text_edit.setReadOnly(True)
+        layout.addWidget(text_edit)
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(error_dialog.accept)
+        layout.addWidget(close_button)
+        error_dialog.setLayout(layout)
+        error_dialog.exec()
 
 def show_dialog(parent=None):
     dialog = CustomInputDialog(parent)

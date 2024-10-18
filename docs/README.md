@@ -7,6 +7,7 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 - Process notes using AI models via OpenRouter API
 - Create Anki flashcards with custom templates
 - Flexible workflow system using YAML configuration files
+- Improved error handling and debugging capabilities
 
 ## Installation
 
@@ -23,7 +24,8 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 3. In Anki, go to Tools > Notes2Flash to open the addon interface.
 4. Select your desired workflow configuration from the dropdown menu.
 5. Fill in the required input fields based on the selected workflow.
-6. Click "Submit" to start the flashcard creation process.
+6. (Optional) Enable debug mode for more detailed logging.
+7. Click "Submit" to start the flashcard creation process.
 
 ## Creating Custom Workflows
 
@@ -33,45 +35,57 @@ Custom workflows are defined using YAML configuration files. Here's an example s
 workflow_name: "Vocabulary Extraction and Translation"
 
 stages: ["scrape_notes", "process_notes_to_cards", "add_cards_to_anki"]
-user_inputs: [google_doc_id, openrouter_api_key, target_language]
+user_inputs: [google_doc_id, openrouter_api_key, target_language, deckname]
 
 scrape_notes:
   doc_id: "{google_doc_id}"
+  output:
+    name: scraped_notes_output
+    keys:
+      - notes_content
 
 process_notes_to_cards:
   api_key: "{openrouter_api_key}"
   steps:
     - name: "Extract Vocabulary"
-      prompt: "Extract vocabulary from the following content: {notes_content}"
-      input:
-        - notes_content
-      output: vocabulary_list
-      model: "openai_gpt3"
-
-    - name: "Translate Vocabulary"
-      prompt: "Translate the following vocabulary: {vocabulary_list} to {target_language}"
-      input:
-        - vocabulary_list
-        - target_language
-      output: translated_vocabulary
-      model: "openai_gpt4"
-
-    - name: "Generate Flashcards"
       prompt: |
-        Create flashcards using this vocabulary: {vocabulary_list} and the following translations {translated_vocabulary} into the following format:
-        [
-          {"vocab": "vocab1", "translation": "translation1"},
-          {"vocab": "vocab2", "translation": "translation2"},
-          ...
-        ]
+        Extract vocabulary from the following content: {scraped_notes_output.notes_content}.
+        Output the result as a JSON object in this format:
+        {
+          "vocabulary_list": ["word1", "word2", "word3", ...]
+        }
       input:
-        - vocabulary_list
-        - translated_vocabulary
-      output: flashcards
-      model: "openai_gpt4"
+        - scraped_notes_output.notes_content
+      output:
+        name: vocabulary_extraction_output
+        keys:
+          - vocabulary_list
+      model: "meta-llama/llama-3.1-8b-instruct:free"
+
+    - name: "Translate and Generate Flashcards"
+      prompt: |
+        Translate the following vocabulary: {vocabulary_extraction_output.vocabulary_list} into {target_language}. 
+        Then, using the translations, generate flashcards in this format:
+        {
+          "flashcards": [
+            {"vocab": "word1", "translation": "translation1"},
+            {"vocab": "word2", "translation": "translation2"},
+            ...
+          ]
+        }
+      input:
+        - vocabulary_extraction_output.vocabulary_list
+        - target_language
+      output:
+        name: flashcards_output
+        keys:
+          - flashcards
+      model: "meta-llama/llama-3.1-8b-instruct:free"
 
 add_cards_to_anki:
-  deck_name: "Vocabulary Deck"
+  input:
+    - flashcards_output.flashcards
+  deck_name: "{deckname}"
   card_template:
     template_name: "Basic"
     front: "{vocab}"
@@ -88,11 +102,27 @@ Save your custom workflow configurations in the `addon/workflow_configs` directo
 4. **AI Model Integration**: Use different AI models for various processing steps.
 5. **Card Templates**: Define how the flashcards should be formatted in Anki.
 
+## Debugging and Troubleshooting
+
+- Enable debug mode in the addon interface for more detailed logging.
+- Check the `notes2flash.log` file in the addon directory for detailed error messages and execution logs.
+- Use the logs to identify issues in your workflow configuration or API calls.
+
 ## Tips for Creating Effective Workflows
 
 - Start with simple workflows and gradually add complexity.
 - Test your workflows with various types of notes to ensure they work as expected.
 - Use descriptive names for your workflow files to easily identify their purpose.
 - Leverage the flexibility of the system to create workflows for different subjects or study methods.
+- Use the debug mode and logs to fine-tune your prompts and improve the quality of generated flashcards.
 
-For more detailed information on creating and customizing workflows, please refer to the documentation in the `docs` folder.
+## Error Handling
+
+The addon now provides more detailed error messages and logging. If you encounter any issues:
+
+1. Check the error message displayed in the Anki interface.
+2. Review the `notes2flash.log` file for more detailed information.
+3. Ensure your workflow configuration is correct and all required fields are provided.
+4. Verify that your API keys and other credentials are valid and correctly entered.
+
+For more detailed information on creating and customizing workflows, troubleshooting, and advanced features, please refer to the documentation in the `docs` folder.
