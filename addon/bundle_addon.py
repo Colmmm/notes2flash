@@ -7,14 +7,39 @@ def bundle_addon():
     addon_dir = "/app/addon"
     libs_dir = os.path.join(addon_dir, "libs")
     output_file = "/app/notes2flash.ankiaddon"
+    requirements_file = "/app/requirements.txt"
+    installed_packages_file = os.path.join(libs_dir, "installed_packages.txt")
 
-    # Step 1: Clean up any existing libs folder
-    if os.path.exists(libs_dir):
-        shutil.rmtree(libs_dir)
+    # Step 1: Check if the libs directory needs updating
+    if not os.path.exists(libs_dir):
+        os.makedirs(libs_dir)
+        install_dependencies = True
+    else:
+        # Compare installed packages with the requirements file
+        try:
+            with open(requirements_file, 'r') as f:
+                required_packages = f.read().splitlines()
 
-    # Step 2: Install dependencies into the 'libs' folder
-    print("Installing dependencies...")
-    subprocess.run(["pip", "install", "--target", libs_dir, "-r", "/app/requirements.txt"], check=True)
+            installed_packages = subprocess.check_output(
+                ["pip", "freeze", "--path", libs_dir]
+            ).decode("utf-8").splitlines()
+
+            # Check if there's a difference between required and installed packages
+            install_dependencies = set(required_packages) != set(installed_packages)
+        except Exception as e:
+            print(f"Error checking installed packages: {e}")
+            install_dependencies = True  # Install if comparison fails
+
+    # Step 2: Install or update dependencies only if needed
+    if install_dependencies:
+        print("Installing or updating dependencies...")
+        subprocess.run(["pip", "install", "--target", libs_dir, "-r", requirements_file], check=True)
+        with open(installed_packages_file, 'w') as f:
+            f.write('\n'.join(subprocess.check_output(
+                ["pip", "freeze", "--path", libs_dir]
+            ).decode("utf-8").splitlines()))
+    else:
+        print("Dependencies are already up to date. Skipping installation.")
 
     # Step 3: Clean up any existing __pycache__ folders
     print("Removing __pycache__ folders...")

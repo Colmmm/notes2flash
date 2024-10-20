@@ -3,16 +3,34 @@ import requests
 import json
 import logging
 import re
+import os
 
 logger = logging.getLogger(__name__)
 
-def call_openrouter_api(prompt, api_key, model, input_data):
+def get_api_key_from_config():
+    """Read the OpenRouter API key from the addon's config file."""
+    addon_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(addon_dir, "config.json")
+    try:
+        with open(config_path, 'r') as config_file:
+            config = json.load(config_file)
+        api_key = config.get('openrouter_api_key')
+        if not api_key:
+            raise ValueError("OpenRouter API key not found in config.json")
+        return api_key
+    except Exception as e:
+        logger.error(f"Error reading API key from config: {str(e)}")
+        raise
+
+def call_openrouter_api(prompt, model, input_data):
     """Send a request to the OpenRouter API for processing notes."""
     url = "https://openrouter.ai/api/v1/chat/completions"
     
-    if not api_key:
-        logger.error("OpenRouter API key is not provided in the stage_config.")
-        raise ValueError("OpenRouter API key is not provided in the stage_config.")
+    try:
+        api_key = get_api_key_from_config()
+    except Exception as e:
+        logger.error(f"Failed to get API key: {str(e)}")
+        raise
 
     # Format the prompt with input data
     try:
@@ -58,7 +76,7 @@ def call_openrouter_api(prompt, api_key, model, input_data):
 
 def extract_json_from_text(text):
     """Extract JSON data from potentially noisy text."""
-    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+    json_match = re.search(r'\[.*\]', text, re.DOTALL)
     if json_match:
         try:
             return json.loads(json_match.group())
@@ -81,69 +99,60 @@ def get_nested_value(data, key_path):
     return value
 
 def process_notes_to_cards(stage_data, stage_config):
-    """Process notes to cards using the provided multi-step configuration."""
+    """Process notes to cards using the provided configuration."""
     logger.info("Starting process_notes_to_cards")
-    api_key = stage_config.get('api_key', '')
-    steps = stage_config.get('steps', [])
     
-    # Initialize the data dictionary with the input stage_data
-    data = stage_data.copy()
-    logger.debug(f"Initial data: {data}")
+    if not isinstance(stage_config, list) or len(stage_config) == 0:
+        raise ValueError("Invalid stage_config. Expected a non-empty list.")
 
-    for step in steps:
-        name = step.get('name', 'Unnamed Step')
-        prompt = step.get('prompt', '')
-        model = step.get('model', 'meta-llama/llama-3.1-8b-instruct:free')
-        input_keys = step.get('input', [])
-        output_config = step.get('output', {})
+    # For now, we'll only handle the first processing step
+    config = stage_config[0]
+    
+    model = config.get('model', 'meta-llama/llama-3.1-8b-instruct:free')
+    prompt = config.get('prompt', '')
+    input_keys = config.get('input', [])
+    output_name = config.get('output', 'flashcards')
+    output_fields = config.get('output_fields', [])
 
-        logger.info(f"Executing step: {name}")
+    if not output_fields:
+        raise ValueError("No output fields specified in the configuration.")
 
-        # Prepare input data for this step
-        step_input = {}
-        for key in input_keys:
-            try:
-                step_input[key.split('.')[-1]] = get_nested_value(data, key)
-            except KeyError as e:
-                logger.error(f"Error preparing input for step '{name}': {str(e)}")
-                raise ValueError(f"Required input '{key}' not found for step '{name}'")
+    # Prepare input data for this step
+    step_input = {}
+    for key in input_keys:
+        try:
+            step_input[key.split('.')[-1]] = get_nested_value(stage_data, key)
+        except KeyError as e:
+            logger.error(f"Error preparing input: {str(e)}")
+            raise ValueError(f"Required input '{key}' not found in stage data")
+    
+    logger.debug(f"Step input: {step_input}")
+
+    # Remove any placeholders from the prompt that are not in step_input
+    prompt = re.sub(r'\{[^}]*\}', lambda m: m.group(0) if m.group(0)[1:-1] in step_input else '', prompt)
+
+    # Call the API
+    try:
+        result = call_openrouter_api(prompt, model, step_input)
+        logger.debug(f"API result: {result}")
+    except Exception as e:
+        logger.error(f"Error in API call: {str(e)}")
+        raise ValueError(f"Error in API call: {str(e)}")
+
+    # Parse and validate the result
+    try:
+        parsed_result = extract_json_from_text(result)
+        if parsed_result is None or not isinstance(parsed_result, list):
+            raise ValueError("Failed to extract valid JSON list from API output")
         
-        logger.debug(f"Step input for '{name}': {step_input}")
-
-        # Call the API
-        try:
-            result = call_openrouter_api(prompt, api_key, model, step_input)
-            logger.debug(f"API result for '{name}': {result}")
-        except Exception as e:
-            logger.error(f"Error in API call for step '{name}': {str(e)}")
-            raise ValueError(f"Error in step '{name}': {str(e)}")
-
-        # Parse and store the result
-        try:
-            parsed_result = extract_json_from_text(result)
-            if parsed_result is None:
-                raise ValueError(f"Failed to extract valid JSON from step '{name}' output")
-            
-            output_name = output_config.get('name', 'unnamed_output')
-            output_keys = output_config.get('keys', [])
-            
-            data[output_name] = {key: parsed_result.get(key) for key in output_keys}
-            logger.debug(f"Updated data after step '{name}': {data}")
-        except Exception as e:
-            logger.error(f"Error processing output from step '{name}': {str(e)}")
-            raise ValueError(f"Error processing output from step '{name}': {str(e)}")
-
-    # Prepare the final output
-    final_output = {}
-    final_step_output = data.get(steps[-1]['output']['name'], {})
-    final_output_key = steps[-1]['output']['keys'][0]  # Assuming the last step's first key is the final output
-    
-    if final_output_key in final_step_output:
-        final_output[final_output_key] = final_step_output[final_output_key]
-    else:
-        logger.error(f"Expected output key '{final_output_key}' not found in final step output")
-        raise ValueError(f"Expected output key '{final_output_key}' not found in final step output")
-
-    logger.info("Completed process_notes_to_cards")
-    logger.debug(f"Final output: {final_output}")
-    return final_output
+        # Validate the structure of each item in the list
+        for item in parsed_result:
+            if not isinstance(item, dict) or not all(field in item for field in output_fields):
+                raise ValueError(f"Invalid structure in API output. Expected fields: {output_fields}")
+        
+        logger.info("Completed process_notes_to_cards")
+        logger.debug(f"Final output: {parsed_result}")
+        return {output_name: parsed_result}
+    except Exception as e:
+        logger.error(f"Error processing API output: {str(e)}")
+        raise ValueError(f"Error processing API output: {str(e)}")

@@ -69,20 +69,19 @@ def add_cards_to_anki(stage_data, stage_config):
     # Ensure the deck exists
     check_or_create_deck(deck_name)
 
-    # Get the flashcards data
-    flashcards_data = stage_data.get('flashcards_output', {}).get('flashcards', [])
-    logger.debug(f"Flashcards data: {flashcards_data}")
+    # Get the flashcards data using the flashcards_data key from the configuration
+    flashcards_key = stage_config.get('flashcards_data', 'flashcards')
+    flashcards = stage_data.get(flashcards_key, [])
+    logger.debug(f"Flashcards data: {flashcards}")
     
-    if isinstance(flashcards_data, str):
+    if isinstance(flashcards, str):
         try:
-            flashcards = json.loads(flashcards_data)
+            flashcards = json.loads(flashcards)
         except json.JSONDecodeError:
-            logger.error(f"Error: Invalid JSON data in flashcards: {flashcards_data}")
+            logger.error(f"Error: Invalid JSON data in flashcards: {flashcards}")
             return {"cards_added": 0, "error": "Invalid JSON data in flashcards"}
-    elif isinstance(flashcards_data, list):
-        flashcards = flashcards_data
-    else:
-        logger.error(f"Error: Unexpected flashcards data type: {type(flashcards_data)}")
+    elif not isinstance(flashcards, list):
+        logger.error(f"Error: Unexpected flashcards data type: {type(flashcards)}")
         return {"cards_added": 0, "error": "Unexpected flashcards data type"}
 
     cards_added = 0

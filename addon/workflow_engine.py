@@ -40,27 +40,22 @@ class WorkflowEngine:
 
     @staticmethod
     def validate_config(config):
-        required_keys = ['workflow_name', 'stages', 'user_inputs']
+        required_keys = ['workflow_name', 'user_inputs', 'scrape_notes', 'process_notes_to_cards', 'add_cards_to_anki']
         for key in required_keys:
             if key not in config:
                 raise ValueError(f"Missing required key in workflow config: {key}")
 
-        if not isinstance(config['stages'], list) or len(config['stages']) == 0:
-            raise ValueError("'stages' must be a non-empty list")
-
         if not isinstance(config['user_inputs'], list) or len(config['user_inputs']) == 0:
             raise ValueError("'user_inputs' must be a non-empty list")
 
-        for stage in config['stages']:
-            if stage not in config:
-                raise ValueError(f"Missing configuration for stage: {stage}")
-            
-        if 'process_notes_to_cards' in config:
-            if 'steps' not in config['process_notes_to_cards']:
-                raise ValueError("Missing 'steps' in process_notes_to_cards configuration")
-            for step in config['process_notes_to_cards']['steps']:
-                if 'name' not in step or 'prompt' not in step or 'input' not in step or 'output' not in step:
-                    raise ValueError(f"Invalid step configuration in process_notes_to_cards: {step}")
+        if not isinstance(config['scrape_notes'], list) and not isinstance(config['scrape_notes'], dict):
+            raise ValueError("'scrape_notes' must be a list or a dictionary")
+
+        if not isinstance(config['process_notes_to_cards'], list):
+            raise ValueError("'process_notes_to_cards' must be a list")
+
+        if not isinstance(config['add_cards_to_anki'], dict):
+            raise ValueError("'add_cards_to_anki' must be a dictionary")
 
     def replace_placeholders(self, config, data):
         """Replace placeholders in the config with values from the user inputs."""
@@ -89,14 +84,18 @@ class WorkflowEngine:
 
             if stage_name == "scrape_notes":
                 result = scrape_notes(stage_config)
-                output_name = stage_config.get('output', {}).get('name', 'scrape_notes_output')
-                self.stage_data[output_name] = result
+                output_name = stage_config[0].get('output', 'scraped_notes_output') if isinstance(stage_config, list) else stage_config.get('output', 'scraped_notes_output')
+                self.stage_data[output_name] = result[output_name]
             elif stage_name == "process_notes_to_cards":
+                if not isinstance(stage_config, list) or len(stage_config) == 0:
+                    raise ValueError("Invalid stage_config for process_notes_to_cards. Expected a non-empty list.")
                 logger.debug(f"Input data for process_notes_to_cards: {self.stage_data}")
                 result = process_notes_to_cards(self.stage_data, stage_config)
                 logger.debug(f"Output from process_notes_to_cards: {result}")
-                self.stage_data.update(result)
+                self.stage_data.update(result)  # This will add the 'flashcards' key to stage_data
             elif stage_name == "add_cards_to_anki":
+                if not isinstance(stage_config, dict):
+                    raise ValueError("Invalid stage_config for add_cards_to_anki. Expected a dictionary.")
                 result = add_cards_to_anki(self.stage_data, stage_config)
             else:
                 raise ValueError(f"Unknown stage: {stage_name}")
@@ -115,7 +114,8 @@ class WorkflowEngine:
             self.stage_data.update(self.user_inputs)
             logger.debug(f"Initial stage data: {self.stage_data}")
 
-            for stage in self.workflow_config['stages']:
+            stages = ['scrape_notes', 'process_notes_to_cards', 'add_cards_to_anki']
+            for stage in stages:
                 logger.info(f"Preparing stage: {stage}")
                 if progress_callback:
                     progress_callback(f"Preparing stage: {stage}")

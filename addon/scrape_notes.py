@@ -1,6 +1,7 @@
 # scrape_notes.py
 import os
 import sys
+import logging
 
 # Add the path to the `libs` directory where extra packages are bundled
 addon_folder = os.path.dirname(__file__)
@@ -10,6 +11,9 @@ if libs_path not in sys.path:
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Path to the service account key file (use ENV var for flexibility)
 current_dir = os.path.dirname(__file__)
@@ -46,13 +50,25 @@ def extract_text_from_doc(doc):
     return ''.join(text)
 
 def scrape_notes(stage_config):
-    doc_id = stage_config.get('doc_id')
+    if isinstance(stage_config, list):
+        if len(stage_config) == 0:
+            raise ValueError("Invalid stage_config. Expected a non-empty list or a dictionary.")
+        config = stage_config[0]
+    elif isinstance(stage_config, dict):
+        config = stage_config
+    else:
+        raise ValueError("Invalid stage_config. Expected a list or a dictionary.")
+
+    doc_id = config.get('doc_id')
+    output_key = config.get('output', 'scraped_notes_output')
+
     if not doc_id:
         raise ValueError("Google Doc ID not provided in stage_config.")
+
     try:
         doc_content = fetch_google_doc_content(doc_id)
         doc_text = extract_text_from_doc(doc_content)
-        return {"notes_content": doc_text}
+        return {output_key: doc_text}
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        logger.error(f"An error occurred while scraping notes: {str(e)}")
         raise
