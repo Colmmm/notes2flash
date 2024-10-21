@@ -20,29 +20,29 @@ def check_or_create_deck(deck_name):
 
     return deck_id
 
-def add_note_to_deck(deck_name, model_name, fields):
+def add_note_to_deck(deck_name, note_type_name, fields):
     """Add a new note (flashcard) to the specified deck."""
     logger.info(f"Adding note to deck '{deck_name}': Fields - {fields}")
 
-    # Get the deck ID and model for the note
+    # Get the deck ID and note type for the note
     deck_id = check_or_create_deck(deck_name)
-    model = mw.col.models.byName(model_name)
+    note_type = mw.col.models.by_name(note_type_name)
 
-    if not model:
-        raise ValueError(f"Model '{model_name}' not found in Anki.")
+    if not note_type:
+        raise ValueError(f"Note type '{note_type_name}' not found in Anki.")
 
     # Create a new note
-    note = Note(mw.col, model)
+    note = Note(mw.col, note_type)
     
     # Set the fields of the note
     for i, (field_name, field_value) in enumerate(fields.items()):
         if i < len(note.fields):
             note.fields[i] = field_value
         else:
-            logger.warning(f"Field '{field_name}' not found in the note model.")
+            logger.warning(f"Field '{field_name}' not found in the note type.")
     
     # Set the deck ID for the note
-    note.model()['did'] = deck_id
+    note.note_type()['did'] = deck_id
 
     # Add the note to the collection
     if mw.col.addNote(note):
