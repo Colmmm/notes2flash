@@ -19,7 +19,8 @@ process_notes_to_cards:
       - question
       - answer
     prompt: |
-      Organize the following notes on the topic "{topic}" to help with revision.
+      Organize the following notes on the topic "{topic}" to help with revision:
+      {scraped_notes_output} 
       For each note, create a flashcard using the exact format below, where the key for the question should be "question" and the key for the answer should be "answer".
       Do not use any other keys or formats.
 
