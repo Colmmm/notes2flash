@@ -1,4 +1,4 @@
-from aqt.qt import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QComboBox, QMessageBox, QCheckBox, QTextEdit
+from aqt.qt import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QComboBox, QMessageBox, QCheckBox, QTextEdit, QWidget
 from aqt import mw
 from aqt.utils import showInfo
 from .notes2flash import notes2flash
@@ -15,6 +15,7 @@ class CustomInputDialog(QDialog):
         
         self.layout = QVBoxLayout()
         self.input_fields = {}
+        self.input_labels = {}
 
         # Dropdown for Workflow Configuration
         self.workflow_label = QLabel("Select Workflow Configuration:")
@@ -23,6 +24,11 @@ class CustomInputDialog(QDialog):
         self.populate_workflow_dropdown()
         self.layout.addWidget(self.workflow_dropdown)
         self.workflow_dropdown.currentIndexChanged.connect(self.on_workflow_changed)
+
+        # Container for dynamic input fields
+        self.input_container = QWidget()
+        self.input_layout = QVBoxLayout(self.input_container)
+        self.layout.addWidget(self.input_container)
 
         # Debug mode checkbox
         self.debug_checkbox = QCheckBox("Enable Debug Mode")
@@ -49,11 +55,15 @@ class CustomInputDialog(QDialog):
         self.workflow_dropdown.addItems(workflow_files)
 
     def on_workflow_changed(self, index):
-        # Clear existing input fields
+        # Clear existing input fields and labels
         for widget in self.input_fields.values():
-            self.layout.removeWidget(widget)
+            self.input_layout.removeWidget(widget)
+            widget.deleteLater()
+        for widget in self.input_labels.values():
+            self.input_layout.removeWidget(widget)
             widget.deleteLater()
         self.input_fields.clear()
+        self.input_labels.clear()
 
         # Load the selected workflow configuration
         workflow_file = self.workflow_dropdown.currentText()
@@ -66,11 +76,18 @@ class CustomInputDialog(QDialog):
 
         # Create input fields based on user_inputs in the workflow config
         for input_name in workflow_config.get('user_inputs', []):
-            label = QLabel(f"Enter {input_name}:")
-            self.layout.insertWidget(self.layout.count() - 3, label)  # Insert before debug checkbox
+            label = QLabel(f"{input_name}:")
+            self.input_layout.addWidget(label)
             input_field = QLineEdit()
-            self.layout.insertWidget(self.layout.count() - 3, input_field)
+            self.input_layout.addWidget(input_field)
             self.input_fields[input_name] = input_field
+            self.input_labels[input_name] = label
+
+        # Update the layout to reflect the changes
+        self.input_layout.update()
+
+        # Adjust the size of the window
+        self.adjustSize()
 
     def submit_data(self):
         workflow_config = self.workflow_dropdown.currentText()
