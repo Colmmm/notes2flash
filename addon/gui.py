@@ -11,7 +11,7 @@ import logging
 class CustomInputDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Custom Flashcard Generator")
+        self.setWindowTitle("Notes2Flash")
         
         self.layout = QVBoxLayout()
         self.input_fields = {}
