@@ -86,7 +86,7 @@ class CustomInputDialog(QDialog):
         # Update the layout to reflect the changes
         self.input_layout.update()
 
-        # Adjust the size of the window
+        # Adjust the size of the window after any changes
         self.adjustSize()
 
     def submit_data(self):
