@@ -7,7 +7,7 @@ if libs_path not in sys.path:
     sys.path.insert(0, libs_path)
 
 import yaml
-from .scrape_notes import scrape_notes
+from .scrape_notes import scrape_notes, mark_document_as_processed, get_document_state, update_document_state
 from .process_notes_to_cards import process_notes_to_cards
 from .add_cards_to_anki import add_cards_to_anki
 
@@ -107,6 +107,25 @@ class WorkflowEngine:
             return result
         except Exception as e:
             logger.error(f"Error in stage {stage_name}: {str(e)}")
+            
+            # If there's an error in a stage after scrape_notes, preserve the pending changes
+            if stage_name != "scrape_notes":
+                scrape_config = self.workflow_config.get('scrape_notes', {})
+                if isinstance(scrape_config, list):
+                    scrape_config = scrape_config[0]
+                doc_id = scrape_config.get('doc_id')
+                if doc_id:
+                    doc_id = self.replace_placeholders(doc_id, self.stage_data)
+                    doc_state = get_document_state(doc_id)
+                    # Keep the pending changes but mark as not processed
+                    update_document_state(
+                        doc_id,
+                        doc_state['lines'],
+                        doc_state['version'],
+                        False,
+                        doc_state.get('pending_changes', [])
+                    )
+            
             raise
 
     def run_workflow(self, progress_callback=None):
@@ -129,6 +148,17 @@ class WorkflowEngine:
                     self.stage_data[stage] = stage_result
 
                 logger.debug(f"Stage data after {stage}: {self.stage_data}")
+
+            # After successful completion of all stages, mark the document as successfully processed
+            scrape_config = self.workflow_config.get('scrape_notes', {})
+            if isinstance(scrape_config, list):
+                scrape_config = scrape_config[0]
+            doc_id = scrape_config.get('doc_id')
+            if doc_id:
+                # Replace any placeholders in doc_id
+                doc_id = self.replace_placeholders(doc_id, self.stage_data)
+                mark_document_as_processed(doc_id)  # This will also clear pending changes
+                logger.info(f"Marked document {doc_id} as successfully processed")
 
             logger.info("Workflow completed successfully")
             if progress_callback:
