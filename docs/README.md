@@ -1,9 +1,7 @@
 # notes2flash
 AI-powered application to organize Google Doc notes and convert them into Anki flashcards.
 
-![Notes2Flash Demo](docs/notes2flash_demo.gif)
-
-
+![Notes2Flash Demo](notes2flash_demo.gif)
 
 ## Features
 
