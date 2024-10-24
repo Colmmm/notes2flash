@@ -1,6 +1,6 @@
 workflow_name: "Vocabulary Extraction and Flashcard Generation"
 
-user_inputs: [google_doc_id, target_language, native_language, deckname]
+user_inputs: [google_doc_id, native_language, deckname]
 
 # 1) **Scrape Notes from Google Docs**
 scrape_notes:
@@ -10,24 +10,26 @@ scrape_notes:
 # 2) **Process Notes into Flashcards**
 process_notes_to_cards:
   - step: "Process notes and create flashcards"
-    model: "meta-llama/llama-3.1-8b-instruct:free"
+    model: "openai/gpt-4o-mini"
     input:
       - scraped_notes_output  # Input is the notes content from Google Docs
       - native_language  # Input is the native language for translation
-      - target_language
     output: flashcards  # The output should always be a list of dictionaries with the following fields:
     output_fields:
-      - vocabulary
+      - mandarin
+      - pinyin
       - translation
     prompt: |
-      Extract {target_language} vocabulary from {scraped_notes_output}. Translate it into {native_language}.
-      For each vocabulary word, generate flashcards in the exact format below, where the key for the word should be "vocabulary" and the key for the translation should be "translation". 
+      Extract Mandarin vocabulary from {scraped_notes_output}. Translate it into {native_language}.
+      For each mandarin word, generate flashcards in the exact format below, where the key for the word should be "mandarin", 
+      the key for the pinyin of the mandarin word should be "pinyin",
+      and the key for the translation should be "translation". 
       Do not use any other keys or formats.
 
       Output flashcards in this format:
       [
-        {"vocabulary": "word1", "translation": "translation1"},
-        {"vocabulary": "word2", "translation": "translation2"},
+        {"mandarin": "word1", "pinyin": "pinyin1", "translation": "translation1"},
+        {"mandarin": "word2", "pinyin": "pinyin2", "translation": "translation2"},
         ...
       ]
      
@@ -37,5 +39,5 @@ add_cards_to_anki:
   deck_name: "{deckname}"
   card_template:
     template_name: "Basic"
-    front: "{vocabulary}"
-    back: "{translation}"
+    front: "{mandarin}"
+    back: "{pinyin}<br><br>{translation}"

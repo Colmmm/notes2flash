@@ -3,6 +3,7 @@ import sys
 import logging
 import json
 import difflib
+import requests
 from datetime import datetime
 
 # Add the path to the `libs` directory where extra packages are bundled
@@ -11,27 +12,54 @@ libs_path = os.path.join(addon_folder, "libs")
 if libs_path not in sys.path:
     sys.path.insert(0, libs_path)
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# Path to the service account key file (use ENV var for flexibility)
+# Path to the service account key file
 current_dir = os.path.dirname(__file__)
-SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json") 
-
-# Define the scope
-SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
-
-# Create credentials object
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-
-# Build the Google Docs API service
-service = build('docs', 'v1', credentials=credentials)
-
+SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json")
 TRACKED_DOCS_FILE = os.path.join(current_dir, "tracked_docs.json")
+
+def is_service_account_available():
+    """Check if service account credentials are available."""
+    return os.path.exists(SERVICE_ACCOUNT_FILE)
+
+def initialize_api_client():
+    """Initialize the Google Docs API client if service account is available."""
+    if not is_service_account_available():
+        return None
+    
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        SCOPES = ['https://www.googleapis.com/auth/documents.readonly']
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        return build('docs', 'v1', credentials=credentials)
+    except Exception as e:
+        logger.error(f"Failed to initialize API client: {str(e)}")
+        return None
+
+def fetch_public_doc_content(doc_id):
+    """Fetches content from a public Google Doc using HTTP requests."""
+    try:
+        url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
+        response = requests.get(url)
+        response.raise_for_status()
+        
+        # Return a document-like structure to maintain compatibility
+        content = response.text
+        return {
+            'body': {
+                'content': [{'paragraph': {'elements': [{'textRun': {'content': line}}]}} 
+                          for line in content.split('\n')]
+            },
+            'revisionId': None  # Public docs don't provide revision info
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch public document: {str(e)}")
+        raise ValueError(f"Failed to fetch public document. Ensure the document is publicly accessible: {str(e)}")
 
 def load_tracked_documents():
     """Load tracked documents from JSON file."""
@@ -74,14 +102,24 @@ def mark_document_as_processed(doc_id):
     tracked_docs = load_tracked_documents()
     if doc_id in tracked_docs:
         tracked_docs[doc_id]['successfully_added_to_anki'] = True
-        tracked_docs[doc_id]['pending_changes'] = []  # Clear pending changes after successful processing
+        tracked_docs[doc_id]['pending_changes'] = []
         save_tracked_documents(tracked_docs)
         logger.info(f"Document {doc_id} marked as successfully processed")
 
 def fetch_google_doc_content(doc_id):
-    """Fetches the content of a Google Doc using its ID."""
-    doc = service.documents().get(documentId=doc_id).execute()
-    return doc
+    """Fetches the content of a Google Doc using either API or public access."""
+    service = initialize_api_client()
+    
+    if service:
+        logger.info("Using authenticated access via service account")
+        try:
+            return service.documents().get(documentId=doc_id).execute()
+        except Exception as e:
+            logger.error(f"API access failed: {str(e)}")
+            raise ValueError(f"Failed to fetch document via API: {str(e)}")
+    else:
+        logger.info("Using public access method (service account not available)")
+        return fetch_public_doc_content(doc_id)
 
 def extract_text_from_doc(doc):
     """Extracts text from a Google Docs JSON response with improved formatting handling."""
@@ -176,6 +214,7 @@ def scrape_notes(stage_config):
         raise ValueError("Google Doc ID not provided in stage_config.")
 
     try:
+        
         # Fetch current document state
         doc_content = fetch_google_doc_content(doc_id)
         current_version = doc_content.get('revisionId')

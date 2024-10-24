@@ -1,0 +1,41 @@
+workflow_name: "Vocabulary Extraction and Flashcard Generation"
+
+user_inputs: [google_doc_id, target_language, native_language, deckname]
+
+# 1) **Scrape Notes from Google Docs**
+scrape_notes:
+  - doc_id: "{google_doc_id}"
+    output: scraped_notes_output  # Only specifying the output name
+
+# 2) **Process Notes into Flashcards**
+process_notes_to_cards:
+  - step: "Process notes and create flashcards"
+    model: "openai/gpt-4o-mini"
+    input:
+      - scraped_notes_output  # Input is the notes content from Google Docs
+      - native_language  # Input is the native language for translation
+      - target_language
+    output: flashcards  # The output should always be a list of dictionaries with the following fields:
+    output_fields:
+      - vocabulary
+      - translation
+    prompt: |
+      Extract {target_language} vocabulary from {scraped_notes_output}. Translate it into {native_language}.
+      For each vocabulary word, generate flashcards in the exact format below, where the key for the word should be "vocabulary" and the key for the translation should be "translation". 
+      Do not use any other keys or formats.
+
+      Output flashcards in this format:
+      [
+        {"vocabulary": "word1", "translation": "translation1"},
+        {"vocabulary": "word2", "translation": "translation2"},
+        ...
+      ]
+     
+#  3)  **Add Cards to Anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # Input is the list of flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Basic"
+    front: "{vocabulary}"
+    back: "{translation}"

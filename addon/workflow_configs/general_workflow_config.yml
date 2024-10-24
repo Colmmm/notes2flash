@@ -10,7 +10,7 @@ scrape_notes:
 # 2) **Process Notes into Flashcards**
 process_notes_to_cards:
   - step: "Organize notes and create flashcards"
-    model: "meta-llama/llama-3.1-8b-instruct:free"
+    model: "openai/gpt-4o-mini"
     input:
       - scraped_notes_output  # Input is the notes content from Google Docs
       - topic  # Input is the topic of the notes for organizing
