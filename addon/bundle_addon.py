@@ -56,6 +56,9 @@ def bundle_addon():
     with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(addon_dir):
             for file in files:
+                # Exclude service_account.json from the bundle
+                if file == "service_account.json":
+                    continue
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, addon_dir)
                 zipf.write(file_path, arcname)
