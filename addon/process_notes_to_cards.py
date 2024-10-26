@@ -57,6 +57,8 @@ def call_openrouter_api(prompt, model, input_data):
             url=url,
             headers={
                 "Authorization": f"Bearer {api_key}",
+                "HTTP-Referer": "https://github.com/Colmmm/notes2flash",
+                "X-Title": "Notes2Flash",
                 "Content-Type": "application/json"
             },
             data=json.dumps(data)
