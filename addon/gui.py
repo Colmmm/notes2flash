@@ -1,4 +1,6 @@
-from aqt.qt import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QApplication, QComboBox, QMessageBox, QCheckBox, QTextEdit, QWidget
+from aqt.qt import (QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, 
+                         QApplication, QComboBox, QMessageBox, QCheckBox, 
+                         QTextEdit, QWidget, QThread, pyqtSignal, QTimer)
 from aqt import mw
 from aqt.utils import showInfo
 from .notes2flash import notes2flash
@@ -8,6 +10,36 @@ import os
 import yaml
 import json
 import logging
+
+class Notes2FlashWorker(QThread):
+    finished = pyqtSignal(dict)
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
+
+    def __init__(self, workflow_config_path, user_inputs, debug_mode):
+        super().__init__()
+        self.workflow_config_path = workflow_config_path
+        self.user_inputs = user_inputs
+        self.debug_mode = debug_mode
+
+    def run(self):
+        try:
+            result = notes2flash(
+                self.workflow_config_path, 
+                self.user_inputs, 
+                progress_callback=lambda msg: self.progress.emit(msg),
+                debug=self.debug_mode
+            )
+            self.finished.emit(result)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            if self.debug_mode:
+                try:
+                    with open('notes2flash.log', 'r') as log_file:
+                        error_message += "\n\nDebug information:\n" + log_file.read()
+                except:
+                    error_message += "\n\nCould not read debug log."
+            self.error.emit(error_message)
 
 class CustomInputDialog(QDialog):
     def __init__(self, parent=None):
@@ -39,6 +71,11 @@ class CustomInputDialog(QDialog):
         self.progress_label = QLabel("Status: Ready")
         self.layout.addWidget(self.progress_label)
 
+        # Long process notice (hidden initially)
+        self.long_process_label = QLabel("Large documents can take a while to process...")
+        self.long_process_label.hide()
+        self.layout.addWidget(self.long_process_label)
+
         # Button to confirm
         self.submit_button = QPushButton("Submit")
         self.layout.addWidget(self.submit_button)
@@ -46,6 +83,19 @@ class CustomInputDialog(QDialog):
 
         # Set layout to dialog
         self.setLayout(self.layout)
+
+        # Initialize worker to None
+        self.worker = None
+
+        # Setup timers
+        self.dots_timer = QTimer()
+        self.dots_timer.setInterval(500)  # Update every 500ms
+        self.dots_timer.timeout.connect(self.update_dots)
+        self.dots_count = 0
+
+        self.long_process_timer = QTimer()
+        self.long_process_timer.setSingleShot(True)
+        self.long_process_timer.timeout.connect(lambda: self.long_process_label.show())
 
         # Load last used workflow and inputs
         self.load_last_workflow_and_inputs()
@@ -69,6 +119,11 @@ class CustomInputDialog(QDialog):
         
         # Explicitly call on_workflow_changed to ensure input fields are populated
         self.on_workflow_changed(self.workflow_dropdown.currentIndex())
+
+    def update_dots(self):
+        self.dots_count = (self.dots_count + 1) % 4
+        dots = "." * self.dots_count
+        self.submit_button.setText(f"Processing{dots}")
 
     def on_workflow_changed(self, index):
         # Clear existing input fields and labels
@@ -99,7 +154,7 @@ class CustomInputDialog(QDialog):
             label = QLabel(f"Enter {input_name}:")
             self.input_layout.addWidget(label)
             input_field = QLineEdit()
-            input_field.setText(saved_inputs.get(input_name, ""))  # Pre-fill with saved input
+            input_field.setText(saved_inputs.get(input_name, ""))
             self.input_layout.addWidget(input_field)
             self.input_fields[input_name] = input_field
             self.input_labels[input_name] = label
@@ -119,36 +174,59 @@ class CustomInputDialog(QDialog):
         # Save user inputs
         self.save_user_inputs(workflow_config, user_inputs)
 
-        # Disable submit button and change text
+        # Start processing animation
         self.submit_button.setEnabled(False)
-        self.submit_button.setText("Processing...")
+        self.dots_timer.start()
+        
+        # Hide the long process label (in case it was shown from a previous run)
+        self.long_process_label.hide()
+        
+        # Start the timer for showing the long process message
+        self.long_process_timer.start(5000)  # Show message after 5 seconds
 
-        try:
-            # Get full path to workflow config
-            workflow_config_path = os.path.join(os.path.dirname(__file__), "workflow_configs", workflow_config)
+        workflow_config_path = os.path.join(os.path.dirname(__file__), "workflow_configs", workflow_config)
+        
+        # Create and setup worker thread
+        self.worker = Notes2FlashWorker(
+            workflow_config_path,
+            user_inputs,
+            self.debug_checkbox.isChecked()
+        )
+        self.worker.progress.connect(self.update_progress)
+        self.worker.finished.connect(self.on_processing_finished)
+        self.worker.error.connect(self.on_processing_error)
+        self.worker.start()
 
-            # Call backend function to start notes2flash
-            self.update_progress("Processing...")
-            result = notes2flash(workflow_config_path, user_inputs, progress_callback=self.update_progress, debug=self.debug_checkbox.isChecked())
-            self.update_progress("Complete")
-            QMessageBox.information(self, "Success", f"Flashcards generated successfully! {result.get('cards_added', 0)} cards added.")
-            self.refresh_anki_decks()
-            self.accept()  # Close the dialog
-        except Exception as e:
-            error_message = f"An error occurred: {str(e)}"
-            if self.debug_checkbox.isChecked():
-                error_message += "\n\nDebug information:"
-                with open('notes2flash.log', 'r') as log_file:
-                    error_message += "\n" + log_file.read()
-            self.show_error_dialog("Error", error_message)
-        finally:
-            # Re-enable submit button and restore text
-            self.submit_button.setEnabled(True)
-            self.submit_button.setText("Submit")
+    def on_processing_finished(self, result):
+        # Stop timers
+        self.dots_timer.stop()
+        self.long_process_timer.stop()
+        
+        # Reset UI
+        self.submit_button.setEnabled(True)
+        self.submit_button.setText("Submit")
+        self.long_process_label.hide()
+        self.update_progress("Complete")
+        
+        QMessageBox.information(self, "Success", 
+            f"Flashcards generated successfully! {result.get('cards_added', 0)} cards added.")
+        self.refresh_anki_decks()
+        self.accept()
+
+    def on_processing_error(self, error_message):
+        # Stop timers
+        self.dots_timer.stop()
+        self.long_process_timer.stop()
+        
+        # Reset UI
+        self.submit_button.setEnabled(True)
+        self.submit_button.setText("Submit")
+        self.long_process_label.hide()
+        
+        self.show_error_dialog("Error", error_message)
 
     def update_progress(self, status):
         self.progress_label.setText(f"Status: {status}")
-        QApplication.processEvents()  # Force GUI update
 
     def refresh_anki_decks(self):
         mw.deckBrowser.refresh()
