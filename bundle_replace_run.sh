@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Exit on error
-set -e
+# Exit on error removed to prevent quitting unexpectedly
+# set -e
 
 # Step 1: Run Docker Compose to bundle the addon
 echo "Bundling the addon using Docker Compose..."
@@ -46,13 +46,17 @@ if [ ! -f "$ADDON_DIR/manifest.json" ]; then
     exit 1
 fi
 
-# Step 7: Clean up the old zip file
+# Step 7: Copy the my_notes2flash_config.json to the Anki addon directory as config.json
+echo "Copying my_notes2flash_config.json to the Anki addons directory as config.json..."
+cp "my_notes2flash_config.json" "${ANKI_BASE}/addons21/notes2flash/config.json"
+
+# Step 8: Clean up the old zip file
 echo "Cleaning up..."
 rm "${ANKI_BASE}/addons21/notes2flash.ankiaddon"
 
 echo "Addon replaced successfully!"
 
-# Step 8: Run Anki with the new bundled addon
+# Step 9: Run Anki with the new bundled addon
 export ANKI_BASE="${ANKI_BASE}"
 echo "Running Anki with ANKI_BASE=${ANKI_BASE}..."
 ./${ANKI_DIR}/anki

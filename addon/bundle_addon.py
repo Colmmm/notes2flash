@@ -63,6 +63,9 @@ def bundle_addon():
                 arcname = os.path.relpath(file_path, addon_dir)
                 zipf.write(file_path, arcname)
 
+        # Include the empty config.json in the bundle
+        zipf.write(os.path.join(addon_dir, "config.json"), "config.json")
+
     print(f"Addon packaged successfully as {output_file}!")
 
 if __name__ == "__main__":
