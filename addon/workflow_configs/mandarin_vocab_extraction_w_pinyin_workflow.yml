@@ -1,6 +1,6 @@
 workflow_name: "Vocabulary Extraction and Flashcard Generation"
 
-user_inputs: [google_doc_id, native_language, deckname]
+user_inputs: [google_doc_id, native_language, deckname, chunk_size]
 
 # 1) **Scrape Notes from Google Docs**
 scrape_notes:
@@ -11,6 +11,7 @@ scrape_notes:
 process_notes_to_cards:
   - step: "Process notes and create flashcards"
     model: "openai/gpt-4o-mini"
+    chunk_size: "{chunk_size}"  # Maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
     input:
       - scraped_notes_output  # Input is the notes content from Google Docs
       - native_language  # Input is the native language for translation

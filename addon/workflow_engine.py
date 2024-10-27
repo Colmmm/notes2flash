@@ -90,7 +90,7 @@ class WorkflowEngine:
                 if not isinstance(stage_config, list) or len(stage_config) == 0:
                     raise ValueError("Invalid stage_config for process_notes_to_cards. Expected a non-empty list.")
                 logger.debug(f"Input data for process_notes_to_cards: {self.stage_data}")
-                result = process_notes_to_cards(self.stage_data, stage_config)
+                result = process_notes_to_cards(self.stage_data, stage_config, self.workflow_config)
                 logger.debug(f"Output from process_notes_to_cards: {result}")
                 self.stage_data.update(result)  # This will add the 'flashcards' key to stage_data
             elif stage_name == "add_cards_to_anki":
