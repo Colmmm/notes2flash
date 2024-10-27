@@ -11,6 +11,11 @@ services:
       - ./addon:/app/addon
       - ./requirements.txt:/app/requirements.txt
       - ./output:/app/output
+      - notes2flash_libs:/app/addon/libs
     environment:
       - PYTHON_VERSION=${PYTHON_VERSION:-3.9}
     command: sh -c "python addon/bundle_addon.py && cp notes2flash.ankiaddon /app/output/"
+
+volumes:
+  notes2flash_libs:
+    name: notes2flash_libs

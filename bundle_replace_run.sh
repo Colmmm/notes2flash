@@ -1,11 +1,42 @@
 #!/bin/bash
 
-# Exit on error removed to prevent quitting unexpectedly
-# set -e
+# Function to get hash of requirements.txt
+get_requirements_hash() {
+    if [ -f "requirements.txt" ]; then
+        sha256sum requirements.txt | cut -d' ' -f1
+    else
+        echo ""
+    fi
+}
+
+# Function to get stored hash
+get_stored_hash() {
+    if [ -f "addon/libs/.requirements_hash" ]; then
+        cat "addon/libs/.requirements_hash"
+    else
+        echo ""
+    fi
+}
+
+# Get current and stored hashes
+CURRENT_HASH=$(get_requirements_hash)
+STORED_HASH=$(get_stored_hash)
+
+# Determine if we need to rebuild
+if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
+    echo "Requirements have changed, rebuilding..."
+    BUILD_FLAG="--build"
+    # Store new hash after successful build
+    mkdir -p addon/libs
+    echo "$CURRENT_HASH" > "addon/libs/.requirements_hash"
+else
+    echo "Requirements unchanged, skipping rebuild..."
+    BUILD_FLAG=""
+fi
 
 # Step 1: Run Docker Compose to bundle the addon
 echo "Bundling the addon using Docker Compose..."
-docker-compose up --build --exit-code-from addon_bundler
+docker-compose up $BUILD_FLAG --exit-code-from addon_bundler
 
 # Step 2: Define paths
 ANKI_DIR="Anki_23.12.1"
