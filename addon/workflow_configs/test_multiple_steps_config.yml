@@ -1,0 +1,63 @@
+workflow_name: "Vocabulary Extraction and Multi-step Processing"
+
+user_inputs: [google_doc_id, deckname]
+
+# 1) **Scrape Notes from Google Docs**
+scrape_notes:
+  - doc_id: "{google_doc_id}"
+    output: scraped_notes_output
+
+# 2) **Process Notes (Multiple Steps)**
+process_notes_to_cards:
+  - step: "Extract key sentences"
+    model: "openai/gpt-4o-mini"
+    chunk_size: 4000
+    input:
+      - scraped_notes_output
+    output: extracted_keywords  # Intermediate output
+    prompt: |
+    prompt: |
+      Extract keywords from the following document. The document contains vocabulary words or short phrases in Mandarin. For each keyword, provide its pinyin and English translation. Remove any irrelevant information or duplicates. If there are multiple valid translations for a keyword, choose the most common one.
+
+      Output in the following format:
+      [
+        {"keyword": "word1", "pinyin": "pinyin1", "translation": "translation1"},
+        {"keyword": "word2", "pinyin": "pinyin2", "translation": "translation2"},
+        ...
+      ]
+
+      Document:
+      {scraped_notes_output}   
+ 
+    
+  - step: "Generate flashcards"
+    model: "openai/gpt-4o-mini"
+    chunk_size: 4000
+    input:
+      - extracted_keywords  # Input is the extracted keywords
+    output: flashcards  # Final output
+    output_fields:
+      - sentence
+      - keywords
+    prompt: |
+    prompt: |
+      For each group of related keywords below, generate a coherent example sentence in Mandarin that uses one or more of the keywords appropriately. Each sentence should be naturally formed, accurately reflect the context, and demonstrate how the keywords can be used together. Provide the pinyin and English translation for the sentence. If a sentence naturally includes more than one keyword, combine the keywords into a single entry with their pinyin and translation.
+
+      Output in the following format:
+      [
+        {"sentence": "sentence1", "keywords": "keyword1A pinyin1A translation1A<br>keyword1B pinyin1B translation1B<br>..."},
+        {"sentence": "sentence2", "keywords": "keyword2A pinyin2A translation2A<br>keyword2B pinyin2B translation2B<br>..."},
+        ...
+      ]
+
+      Keywords:
+      {extracted_keywords}
+   
+#  3)  **Add Cards to Anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # Input is the list of flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Basic"
+    front: "{sentence}"
+    back: "{keywords}"
