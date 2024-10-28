@@ -40,13 +40,16 @@ process_notes_to_cards:
       - sentence
       - keywords
     prompt: |
-    prompt: |
-      For each group of related keywords below, generate a coherent example sentence in Mandarin that uses one or more of the keywords appropriately. Each sentence should be naturally formed, accurately reflect the context, and demonstrate how the keywords can be used together. Provide the pinyin and English translation for the sentence. If a sentence naturally includes more than one keyword, combine the keywords into a single entry with their pinyin and translation.
+      For each group of related keywords below, generate an example sentence in Mandarin that uses one or more of the keywords appropriately. Ensure the sentence is natural and contextually accurate. Provide the pinyin and English translation for each sentence.
 
-      Output in the following format:
+      Additionally, list the keywords used in the sentence in the format: "keyword pinyin translation," using `<br>` as a separator if multiple keywords are included.
+
+      **Important**: The output must be in JSON format where each dictionary has exactly these two keys: "sentence" and "keywords". Do not change these keys.
+
+      Format the output exactly like this:
       [
-        {"sentence": "sentence1", "keywords": "keyword1A pinyin1A translation1A<br>keyword1B pinyin1B translation1B<br>..."},
-        {"sentence": "sentence2", "keywords": "keyword2A pinyin2A translation2A<br>keyword2B pinyin2B translation2B<br>..."},
+        {"sentence": "Here goes the example sentence.", "keywords": "keyword1 pinyin1 translation1<br>keyword2 pinyin2 translation2"},
+        {"sentence": "Another example sentence.", "keywords": "keywordA pinyinA translationA<br>keywordB pinyinB translationB"},
         ...
       ]
 
