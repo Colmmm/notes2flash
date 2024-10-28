@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,43 @@ def get_nested_value(data, key_path):
             raise KeyError(f"Key '{key}' not found in nested structure")
     return value
 
+def get_content_key_from_previous_step(current_step_index: int, stage_config: List[Dict[str, Any]], 
+                                     workflow_config: Dict[str, Any]) -> Tuple[str, str]:
+    """
+    Get the content key and its source from the previous step in the workflow.
+    
+    Args:
+        current_step_index: Index of the current step in stage_config
+        stage_config: List of processing step configurations
+        workflow_config: Complete workflow configuration
+    
+    Returns:
+        Tuple of (content_key, source) where source is either 'scrape_notes' or 'process_step'
+    """
+    # If this is the first processing step, get content key from scrape_notes
+    if current_step_index == 0:
+        scrape_config = workflow_config.get('scrape_notes', [])
+        if isinstance(scrape_config, list) and len(scrape_config) > 0:
+            content_key = scrape_config[0].get('output')
+        elif isinstance(scrape_config, dict):
+            content_key = scrape_config.get('output')
+        else:
+            raise ValueError("Could not determine scrape_notes output key from workflow configuration")
+
+        if not content_key:
+            raise ValueError("No output key found in scrape_notes configuration")
+        
+        return content_key, 'scrape_notes'
+    
+    # Otherwise, get content key from the previous processing step
+    prev_step = stage_config[current_step_index - 1]
+    content_key = prev_step.get('output')
+    
+    if not content_key:
+        raise ValueError(f"No output key found in previous processing step: {prev_step.get('step', 'unnamed')}")
+    
+    return content_key, 'process_step'
+
 def process_chunk(chunk: str, prompt: str, model: str, input_data: Dict[str, Any], content_key: str) -> List[Dict[str, Any]]:
     """Process a single chunk of content and return the parsed results."""
     try:
@@ -152,45 +189,27 @@ def process_chunk(chunk: str, prompt: str, model: str, input_data: Dict[str, Any
         logger.error(f"Error processing chunk: {str(e)}")
         return []
 
-def process_notes_to_cards(stage_data, stage_config, workflow_config):
-    """Process notes to cards using the provided configuration."""
-    logger.info("Starting process_notes_to_cards")
+def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[str, Any], 
+                workflow_config: Dict[str, Any], stage_config: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Process a single step in the workflow."""
+    logger.info(f"Processing step: {step_config.get('step', 'unnamed')}")
     
-    if not isinstance(stage_config, list) or len(stage_config) == 0:
-        raise ValueError("Invalid stage_config. Expected a non-empty list.")
-
-    # For now, we'll only handle the first processing step
-    config = stage_config[0]
+    model = step_config.get('model', 'meta-llama/llama-3.1-8b-instruct:free')
+    prompt = step_config.get('prompt', '')
+    input_keys = step_config.get('input', [])
+    output_name = step_config.get('output', 'flashcards')
+    output_fields = step_config.get('output_fields', [])
     
-    model = config.get('model', 'meta-llama/llama-3.1-8b-instruct:free')
-    prompt = config.get('prompt', '')
-    input_keys = config.get('input', [])
-    output_name = config.get('output', 'flashcards')
-    output_fields = config.get('output_fields', [])
-    
-    # Get chunk size from workflow config, default to 4000 if not specified
-    # Ensure chunk_size is an integer
     try:
-        chunk_size = int(config.get('chunk_size', 4000))
+        chunk_size = int(step_config.get('chunk_size', 4000))
         logger.info(f"Using chunk size: {chunk_size}")
     except (ValueError, TypeError) as e:
         logger.warning(f"Invalid chunk_size in config, using default of 4000 chars: {str(e)}")
         chunk_size = 4000
 
-    if not output_fields:
-        raise ValueError("No output fields specified in the configuration.")
-
-    # Get the output key from scrape_notes stage
-    scrape_config = workflow_config.get('scrape_notes', [])
-    if isinstance(scrape_config, list) and len(scrape_config) > 0:
-        content_key = scrape_config[0].get('output')
-    elif isinstance(scrape_config, dict):
-        content_key = scrape_config.get('output')
-    else:
-        raise ValueError("Could not determine scrape_notes output key from workflow configuration")
-
-    if not content_key:
-        raise ValueError("No output key found in scrape_notes configuration")
+    # Get content key from previous step
+    content_key, source = get_content_key_from_previous_step(step_index, stage_config, workflow_config)
+    logger.debug(f"Using content key '{content_key}' from {source}")
 
     # Prepare input data for this step
     step_input = {}
@@ -206,14 +225,13 @@ def process_notes_to_cards(stage_data, stage_config, workflow_config):
     # Remove any placeholders from the prompt that are not in step_input
     prompt = re.sub(r'\{[^}]*\}', lambda m: m.group(0) if m.group(0)[1:-1] in step_input else '', prompt)
 
-    # Get the content from scrape_notes output
-    content = step_input.get(content_key)
-    if not content:
-        raise ValueError(f"No {content_key} found in input data")
+    # Verify content key exists in input data
+    if content_key not in step_input:
+        raise ValueError(f"Content key '{content_key}' not found in step input data")
 
     # Process content in chunks
     all_results = []
-    chunks = split_content_into_chunks(content, chunk_size)
+    chunks = split_content_into_chunks(step_input[content_key], chunk_size)
     
     if len(chunks) > 1:
         logger.info(f"Processing content in {len(chunks)} chunks")
@@ -225,11 +243,43 @@ def process_notes_to_cards(stage_data, stage_config, workflow_config):
         chunk_results = process_chunk(chunk, prompt, model, step_input, content_key)
         all_results.extend(chunk_results)
 
-    # Validate the structure of each item
-    for item in all_results:
-        if not isinstance(item, dict) or not all(field in item for field in output_fields):
-            raise ValueError(f"Invalid structure in API output. Expected fields: {output_fields}")
+    # Validate the structure of each item if output_fields are specified
+    if output_fields:
+        for item in all_results:
+            if not isinstance(item, dict) or not all(field in item for field in output_fields):
+                raise ValueError(f"Invalid structure in API output. Expected fields: {output_fields}")
     
-    logger.info("Completed process_notes_to_cards")
-    logger.debug(f"Final output: {all_results}")
+    logger.info(f"Completed step: {step_config.get('step', 'unnamed')}")
+    logger.debug(f"Step output: {all_results}")
     return {output_name: all_results}
+
+def process_notes_to_cards(stage_data: Dict[str, Any], stage_config: List[Dict[str, Any]], workflow_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Process notes to cards using the provided configuration, supporting multiple steps."""
+    logger.info("Starting process_notes_to_cards")
+    
+    if not isinstance(stage_config, list) or len(stage_config) == 0:
+        raise ValueError("Invalid stage_config. Expected a non-empty list.")
+
+    # Initialize the processing state with the input stage data
+    processing_state = stage_data.copy()
+    final_output = {}
+
+    # Process each step in sequence
+    for step_index, step_config in enumerate(stage_config):
+        try:
+            # Process the current step
+            step_result = process_step(step_index, step_config, processing_state, workflow_config, stage_config)
+            
+            # Update the processing state with the last step's output
+            processing_state.update(step_result)
+            
+            # Update final output with the step's result
+            final_output.update(step_result)
+            
+        except Exception as e:
+            logger.error(f"Error processing step {step_config.get('step', 'unnamed')}: {str(e)}")
+            raise
+
+    logger.info("Completed process_notes_to_cards")
+    logger.debug(f"Final output: {final_output}")
+    return final_output
