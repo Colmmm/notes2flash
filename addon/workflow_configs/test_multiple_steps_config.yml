@@ -38,23 +38,25 @@ process_notes_to_cards:
     output: flashcards  # Final output
     output_fields:
       - sentence
+      - translation
       - keywords
     prompt: |
-      For each group of related keywords below, generate an example sentence in Mandarin that uses one or more of the keywords appropriately. Ensure the sentence is natural and contextually accurate. Provide the pinyin and English translation for each sentence.
+      prompt: |
+      For each group of related keywords below, generate an example sentence in Mandarin that naturally uses one or more of the keywords in a contextually appropriate way. If the sentence requires additional Mandarin keywords for clarity, include them as well, provided they aren't commonly known by an upper-intermediate learner.
 
-      Additionally, list the keywords used in the sentence in the format: "keyword pinyin translation," using `<br>` as a separator if multiple keywords are included.
+      Additionally, list the keywords in the format "keyword pinyin translation," using `<br>` as a separator if multiple keywords are included.
 
-      **Important**: The output must be in JSON format where each dictionary has exactly these two keys: "sentence" and "keywords". Do not change these keys.
+      **Important**: The output must be in JSON format where each dictionary has exactly these three keys: "sentence," "translation," and "keywords." Do not change these keys.
 
       Format the output exactly like this:
       [
-        {"sentence": "Here goes the example sentence.", "keywords": "keyword1 pinyin1 translation1<br>keyword2 pinyin2 translation2"},
-        {"sentence": "Another example sentence.", "keywords": "keywordA pinyinA translationA<br>keywordB pinyinB translationB"},
+        {"sentence": "Example sentence in Mandarin.", "translation": "English translation of the sentence.", "keywords": "keyword1 pinyin1 translation1<br>keyword2 pinyin2 translation2"},
+        {"sentence": "Another example sentence in Mandarin.", "translation": "English translation of this sentence.", "keywords": "keywordA pinyinA translationA<br>keywordB pinyinB translationB"},
         ...
       ]
 
       Keywords:
-      {extracted_keywords}
+      {extracted_keywords} 
    
 #  3)  **Add Cards to Anki**
 add_cards_to_anki:
@@ -63,4 +65,4 @@ add_cards_to_anki:
   card_template:
     template_name: "Basic"
     front: "{sentence}"
-    back: "{keywords}"
+    back: "{translation}<br><br>{keywords}"
