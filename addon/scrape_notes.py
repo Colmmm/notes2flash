@@ -5,6 +5,9 @@ import json
 import difflib
 import requests
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs
+
+
 
 # Add the path to the `libs` directory where extra packages are bundled
 addon_folder = os.path.dirname(__file__)
@@ -19,6 +22,131 @@ logger = logging.getLogger(__name__)
 current_dir = os.path.dirname(__file__)
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json")
 TRACKED_DOCS_FILE = os.path.join(current_dir, "tracked_docs.json")
+
+def parse_url(url):
+    """Parse URL to determine source type and extract relevant ID."""
+    parsed = urlparse(url)
+    
+    # Handle Google Docs URLs
+    if 'docs.google.com' in parsed.netloc:
+        # Extract doc ID from URL
+        if '/d/' in parsed.path:
+            doc_id = parsed.path.split('/d/')[1].split('/')[0]
+        else:
+            doc_id = parse_qs(parsed.query).get('id', [None])[0]
+        
+        if doc_id:
+            return {'type': 'google_docs', 'id': doc_id}
+    
+    # Handle Notion URLs
+    elif 'notion.site' in parsed.netloc:
+        # Extract page ID (last part of the URL before query params)
+        page_id = parsed.path.split('/')[-1]
+        if page_id:
+            return {'type': 'notion', 'id': page_id}
+    
+    # Handle direct Google Doc IDs
+    elif not parsed.scheme and not parsed.netloc:
+        # If it looks like a Google Doc ID (long alphanumeric string)
+        if len(url) > 25 and url.isalnum():
+            return {'type': 'google_docs', 'id': url}
+    
+    raise ValueError(f"Unsupported URL format: {url}")
+
+def scrape_notion_page(url):
+    """Scrape content from a Notion published page using Selenium for dynamic content."""
+    try:
+        from bs4 import BeautifulSoup
+        # Import selenium only when needed
+        from selenium import webdriver
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        import time
+        
+        # Set up headless Chrome
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        
+        driver = webdriver.Chrome(options=options)
+        driver.get(url)
+        
+        # Wait for content to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='notion-page-content']"))
+        )
+        
+        # Scroll to load all content
+        last_height = driver.execute_script("return document.body.scrollHeight")
+        while True:
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)  # Wait for content to load
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                break
+            last_height = new_height
+        
+        # Get the page content
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        content = []
+        
+        # Process each block
+        blocks = soup.select("[class*='notion-page-content'] [class*='notion-']")
+        for block in blocks:
+            # Get block classes
+            classes = block.get('class', [])
+            
+            # Skip non-content blocks
+            if not classes or not any('notion-' in c for c in classes):
+                continue
+            
+            # Get text content
+            text = block.get_text(strip=True)
+            if not text:
+                continue
+            
+            # Handle different block types
+            if any('notion-header' in c for c in classes):
+                content.append(f"\n{text}\n")
+            elif any('notion-bulleted_list' in c for c in classes):
+                content.append(f"• {text}")
+            elif any('notion-numbered_list' in c for c in classes):
+                content.append(f"- {text}")
+            elif any('notion-code' in c for c in classes):
+                content.append(f"```\n{text}\n```")
+            elif any('notion-quote' in c for c in classes):
+                content.append(f"> {text}")
+            elif any('notion-table' in c for c in classes):
+                rows = []
+                for tr in block.select('tr'):
+                    cells = [td.get_text(strip=True) for td in tr.select('td')]
+                    if any(cells):  # Only add non-empty rows
+                        rows.append(' | '.join(cells))
+                if rows:
+                    content.append('\n'.join(rows))
+            else:
+                content.append(text)
+        
+        driver.quit()
+        
+        # Format content in a way compatible with Google Docs structure
+        return {
+            'body': {
+                'content': [{'paragraph': {'elements': [{'textRun': {'content': line}}]}} 
+                          for line in content if line.strip()]
+            },
+            'revisionId': None  # Notion pages don't provide revision info
+        }
+    except ImportError:
+        logger.error("Selenium is required for scraping Notion pages. Please install selenium package.")
+        raise ValueError("Selenium is required for scraping Notion pages. Please install selenium package.")
+    except Exception as e:
+        logger.error(f"Failed to fetch Notion page: {str(e)}")
+        if 'driver' in locals():
+            driver.quit()
+        raise ValueError(f"Failed to fetch Notion page. Ensure the page is publicly accessible: {str(e)}")
 
 def is_service_account_available():
     """Check if service account credentials are available."""
@@ -48,14 +176,13 @@ def fetch_public_doc_content(doc_id):
         response = requests.get(url)
         response.raise_for_status()
         
-        # Return a document-like structure to maintain compatibility
         content = response.text
         return {
             'body': {
                 'content': [{'paragraph': {'elements': [{'textRun': {'content': line}}]}} 
                           for line in content.split('\n')]
             },
-            'revisionId': None  # Public docs don't provide revision info
+            'revisionId': None
         }
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to fetch public document: {str(e)}")
@@ -207,21 +334,31 @@ def scrape_notes(stage_config):
     else:
         raise ValueError("Invalid stage_config. Expected a list or a dictionary.")
 
-    doc_id = config.get('doc_id')
+    url = config.get('url')
     output_key = config.get('output', 'scraped_notes_output')
 
-    if not doc_id:
-        raise ValueError("Google Doc ID not provided in stage_config.")
+    if not url:
+        raise ValueError("URL not provided in stage_config.")
 
     try:
+        # Parse URL to determine source type
+        source_info = parse_url(url)
+        source_type = source_info['type']
+        source_id = source_info['id']
         
-        # Fetch current document state
-        doc_content = fetch_google_doc_content(doc_id)
+        # Fetch content based on source type
+        if source_type == 'google_docs':
+            doc_content = fetch_google_doc_content(source_id)
+        elif source_type == 'notion':
+            doc_content = scrape_notion_page(url)
+        else:
+            raise ValueError(f"Unsupported source type: {source_type}")
+        
         current_version = doc_content.get('revisionId')
         current_lines = extract_text_from_doc(doc_content)
 
         # Get previous state
-        prev_state = get_document_state(doc_id)
+        prev_state = get_document_state(source_id)
         prev_lines = prev_state['lines']
         prev_version = prev_state['version']
         prev_processed = prev_state.get('successfully_added_to_anki', False)
@@ -229,9 +366,9 @@ def scrape_notes(stage_config):
 
         # For new documents or first-time processing
         if not prev_lines:
-            logger.info(f"New document detected. Initializing tracking for document ID: {doc_id}")
+            logger.info(f"New document detected. Initializing tracking for document ID: {source_id}")
             content_str = '\n\n'.join(current_lines)
-            update_document_state(doc_id, current_lines, current_version, False, current_lines)
+            update_document_state(source_id, current_lines, current_version, False, current_lines)
             return {output_key: content_str}
 
         # Compare versions and get changes
@@ -239,21 +376,20 @@ def scrape_notes(stage_config):
         
         # If there are new changes, process them
         if changes['total_changes'] > 0:
-            logger.info(f"Found {changes['total_changes']} changes in document {doc_id}")
+            logger.info(f"Found {changes['total_changes']} changes in document {source_id}")
             lines_to_process = changes['added'] + changes['modified']
             content_str = '\n\n'.join(lines_to_process)
-            update_document_state(doc_id, current_lines, current_version, False, lines_to_process)
+            update_document_state(source_id, current_lines, current_version, False, lines_to_process)
             return {output_key: content_str}
         
         # If there are pending changes from a previous failed attempt, process only those
         if pending_changes:
             logger.info(f"Processing {len(pending_changes)} pending changes from previous attempt")
             content_str = '\n\n'.join(pending_changes)
-            # Don't update the document state here as we're still working with the same pending changes
             return {output_key: content_str}
 
         # No changes and no pending changes
-        logger.info(f"No changes detected in document {doc_id}")
+        logger.info(f"No changes detected in document {source_id}")
         raise ValueError("No changes detected in document. Skipping further processing.")
 
     except Exception as e:

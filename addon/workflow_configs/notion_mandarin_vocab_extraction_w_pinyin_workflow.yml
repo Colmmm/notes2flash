@@ -1,0 +1,43 @@
+workflow_name: "Vocabulary Extraction and Flashcard Generation"
+
+user_inputs: [deckname]
+
+# 1) **Scrape Notes from Google Docs**
+scrape_notes:
+  - url: "https://colmsam.notion.site/Notes2Flash-Notion-Test-12e9dbe5b94080cd9810c80df7e3e221"
+    output: scraped_notes_output  # Only specifying the output name
+
+# 2) **Process Notes into Flashcards**
+process_notes_to_cards:
+  - step: "Process notes and create flashcards"
+    model: "openai/gpt-4o-mini"
+    chunk_size: 4000  # Maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
+    input:
+      - scraped_notes_output  # Input is the notes content from Google Docs
+    output: flashcards  # The output should always be a list of dictionaries with the following fields:
+    output_fields:
+      - mandarin
+      - pinyin
+      - translation
+    prompt: |
+      Extract Mandarin vocabulary from {scraped_notes_output}. Translate it into English.
+      For each mandarin word, generate flashcards in the exact format below, where the key for the word should be "mandarin", 
+      the key for the pinyin of the mandarin word should be "pinyin",
+      and the key for the translation should be "translation". 
+      Do not use any other keys or formats.
+
+      Output flashcards in this format:
+      [
+        {"mandarin": "word1", "pinyin": "pinyin1", "translation": "translation1"},
+        {"mandarin": "word2", "pinyin": "pinyin2", "translation": "translation2"},
+        ...
+      ]
+     
+#  3)  **Add Cards to Anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # Input is the list of flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Basic"
+    front: "{mandarin}"
+    back: "{pinyin}<br><br>{translation}"
