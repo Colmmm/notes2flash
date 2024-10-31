@@ -10,6 +10,7 @@ from .scrape_utils import (
 )
 from .scrape_googledoc import fetch_google_doc_content
 from .scrape_notion import scrape_notion_page
+from .scrape_obsidian import scrape_obsius_note
 
 # Re-export utility functions that other modules depend on
 __all__ = ['scrape_notes', 'mark_document_as_processed', 'get_document_state', 'update_document_state']
@@ -37,15 +38,35 @@ def scrape_notes(stage_config):
         source_id = source_info['id']
         
         # Fetch content based on source type
+        doc_content = None
         if source_type == 'google_docs':
             doc_content = fetch_google_doc_content(source_id)
         elif source_type == 'notion':
             doc_content = scrape_notion_page(url)
+        elif source_type == 'obsius':
+            doc_content = scrape_obsius_note(url)
         else:
             raise ValueError(f"Unsupported source type: {source_type}")
-        
-        current_version = doc_content.get('revisionId')
-        current_lines = extract_text_from_doc(doc_content)
+            
+        if doc_content is None:
+            logger.error(f"Failed to fetch content from {source_type} source: {url}")
+            raise ValueError(f"Failed to fetch content from {source_type} source: {url}")
+
+        # For Google Docs, we have revision info
+        current_version = None
+        if source_type == 'google_docs':
+            current_version = doc_content.get('revisionId')
+        elif isinstance(doc_content, dict) and 'version' in doc_content:
+            current_version = doc_content.get('version')
+
+        # Extract text content
+        if source_type == 'obsius':
+            # For Obsius, the content is already in the correct format
+            current_lines = doc_content.get('content', '').split('\n')
+            if not current_lines:
+                raise ValueError(f"No content found in Obsius note: {url}")
+        else:
+            current_lines = extract_text_from_doc(doc_content)
 
         # Get previous state
         prev_state = get_document_state(source_id)

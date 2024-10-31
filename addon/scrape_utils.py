@@ -76,7 +76,14 @@ def parse_url(url):
             except ValueError as e:
                 raise ValueError(f"Invalid Notion page ID: {str(e)}")
     
-    # Handle direct IDs (both Google Docs and Notion)
+    # Handle Obsius URLs
+    elif 'obsius.site' in parsed.netloc:
+        # Extract Obsius ID (last part of the URL)
+        obsius_id = parsed.path.strip('/').rstrip(')')
+        if obsius_id:
+            return {'type': 'obsius', 'id': obsius_id}
+    
+    # Handle direct IDs (Google Docs, Notion, and Obsius)
     elif not parsed.scheme and not parsed.netloc:
         # If it looks like a Notion ID (32 chars, hex)
         if looks_like_notion_id(url):
@@ -88,6 +95,9 @@ def parse_url(url):
         # If it looks like a Google Doc ID (long alphanumeric string)
         elif len(url) > 25 and url.isalnum():
             return {'type': 'google_docs', 'id': url}
+        # If it looks like an Obsius ID (shorter alphanumeric string)
+        elif len(url) > 10 and url.isalnum():
+            return {'type': 'obsius', 'id': url}
     
     raise ValueError(f"Unsupported URL format: {url}")
 
@@ -174,6 +184,10 @@ def compare_document_versions(old_lines, new_lines):
 
 def extract_text_from_doc(doc):
     """Extracts text from a Google Docs JSON response with improved formatting handling."""
+    if isinstance(doc, str):
+        # Handle plain text content (e.g., from Obsius)
+        return doc.split('\n')
+        
     content = doc.get('body', {}).get('content', [])
     text_lines = []
     current_line = []
