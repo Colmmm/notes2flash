@@ -7,8 +7,6 @@ import requests
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 
-
-
 # Add the path to the `libs` directory where extra packages are bundled
 addon_folder = os.path.dirname(__file__)
 libs_path = os.path.join(addon_folder, "libs")
@@ -18,10 +16,39 @@ if libs_path not in sys.path:
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# Path to the service account key file
+# Path to config and tracked docs files
 current_dir = os.path.dirname(__file__)
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json")
 TRACKED_DOCS_FILE = os.path.join(current_dir, "tracked_docs.json")
+CONFIG_FILE = os.path.join(current_dir, "config.json")
+
+def load_config():
+    """Load configuration from config.json."""
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config: {str(e)}")
+        return {}
+
+def format_notion_id(page_id):
+    """Format a Notion page ID into UUID format."""
+    # Remove any hyphens that might already exist
+    clean_id = page_id.replace('-', '')
+    
+    # Ensure we have exactly 32 characters
+    if len(clean_id) != 32:
+        raise ValueError(f"Invalid Notion page ID length: {len(clean_id)}")
+    
+    # Format into UUID (8-4-4-4-12)
+    return f"{clean_id[:8]}-{clean_id[8:12]}-{clean_id[12:16]}-{clean_id[16:20]}-{clean_id[20:]}"
+
+def looks_like_notion_id(text):
+    """Check if a string looks like a Notion page ID."""
+    # Remove any hyphens that might exist
+    clean_text = text.replace('-', '')
+    # Check if it's a 32-character hexadecimal string
+    return len(clean_text) == 32 and all(c in '0123456789abcdefABCDEF' for c in clean_text)
 
 def parse_url(url):
     """Parse URL to determine source type and extract relevant ID."""
@@ -40,96 +67,122 @@ def parse_url(url):
     
     # Handle Notion URLs
     elif 'notion.site' in parsed.netloc:
-        # Extract page ID (last part of the URL before query params)
-        page_id = parsed.path.split('/')[-1]
+        # Extract page ID (last part of the URL)
+        page_id = parsed.path.split('-')[-1]  # Get the last part after the last hyphen
         if page_id:
-            return {'type': 'notion', 'id': page_id}
+            try:
+                # Format the ID into UUID format
+                uuid_id = format_notion_id(page_id)
+                return {'type': 'notion', 'id': uuid_id}
+            except ValueError as e:
+                raise ValueError(f"Invalid Notion page ID: {str(e)}")
     
-    # Handle direct Google Doc IDs
+    # Handle direct IDs (both Google Docs and Notion)
     elif not parsed.scheme and not parsed.netloc:
+        # If it looks like a Notion ID (32 chars, hex)
+        if looks_like_notion_id(url):
+            try:
+                uuid_id = format_notion_id(url)
+                return {'type': 'notion', 'id': uuid_id}
+            except ValueError as e:
+                raise ValueError(f"Invalid Notion page ID: {str(e)}")
         # If it looks like a Google Doc ID (long alphanumeric string)
-        if len(url) > 25 and url.isalnum():
+        elif len(url) > 25 and url.isalnum():
             return {'type': 'google_docs', 'id': url}
     
     raise ValueError(f"Unsupported URL format: {url}")
 
 def scrape_notion_page(url):
-    """Scrape content from a Notion published page using Selenium for dynamic content."""
+    """Fetch content from a Notion page using the Notion API."""
     try:
-        from bs4 import BeautifulSoup
-        # Import selenium only when needed
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+        from notion_client import Client
         
-        # Set up headless Chrome
-        options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
+        # Load Notion API key from config
+        config = load_config()
+        notion_api_key = config.get('notion_api_key')
         
-        driver = webdriver.Chrome(options=options)
-        driver.get(url)
+        if not notion_api_key:
+            raise ValueError("Notion API key not found in config.json. Please add your integration token.")
         
-        # Wait for content to load
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='notion-page-content']"))
-        )
+        # Initialize Notion client
+        notion = Client(auth=notion_api_key)
         
-        # Scroll to load all content
-        last_height = driver.execute_script("return document.body.scrollHeight")
-        while True:
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)  # Wait for content to load
-            new_height = driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                break
-            last_height = new_height
+        # Extract page ID from URL
+        source_info = parse_url(url)
+        page_id = source_info['id']
         
-        # Get the page content
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        # Get page content
+        page = notion.pages.retrieve(page_id)
+        blocks = notion.blocks.children.list(page_id)
+        
         content = []
         
-        # Process each block
-        blocks = soup.select("[class*='notion-page-content'] [class*='notion-']")
-        for block in blocks:
-            # Get block classes
-            classes = block.get('class', [])
-            
-            # Skip non-content blocks
-            if not classes or not any('notion-' in c for c in classes):
-                continue
-            
-            # Get text content
-            text = block.get_text(strip=True)
-            if not text:
-                continue
-            
-            # Handle different block types
-            if any('notion-header' in c for c in classes):
-                content.append(f"\n{text}\n")
-            elif any('notion-bulleted_list' in c for c in classes):
-                content.append(f"• {text}")
-            elif any('notion-numbered_list' in c for c in classes):
-                content.append(f"- {text}")
-            elif any('notion-code' in c for c in classes):
-                content.append(f"```\n{text}\n```")
-            elif any('notion-quote' in c for c in classes):
-                content.append(f"> {text}")
-            elif any('notion-table' in c for c in classes):
-                rows = []
-                for tr in block.select('tr'):
-                    cells = [td.get_text(strip=True) for td in tr.select('td')]
-                    if any(cells):  # Only add non-empty rows
-                        rows.append(' | '.join(cells))
-                if rows:
-                    content.append('\n'.join(rows))
-            else:
-                content.append(text)
+        # Process blocks recursively
+        def process_blocks(blocks):
+            for block in blocks.get('results', []):
+                block_type = block.get('type')
+                if not block_type:
+                    continue
+                
+                block_content = block.get(block_type)
+                if not block_content:
+                    continue
+                
+                # Handle different block types
+                if block_type == 'paragraph':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(text)
+                
+                elif block_type == 'heading_1':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"\n# {text}\n")
+                
+                elif block_type == 'heading_2':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"\n## {text}\n")
+                
+                elif block_type == 'heading_3':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"\n### {text}\n")
+                
+                elif block_type == 'bulleted_list_item':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"• {text}")
+                
+                elif block_type == 'numbered_list_item':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"- {text}")
+                
+                elif block_type == 'code':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"```\n{text}\n```")
+                
+                elif block_type == 'quote':
+                    text = ''.join(t.get('text', {}).get('content', '') 
+                                 for t in block_content.get('rich_text', []))
+                    if text:
+                        content.append(f"> {text}")
+                
+                # Handle nested blocks
+                if block.get('has_children'):
+                    child_blocks = notion.blocks.children.list(block.get('id'))
+                    process_blocks(child_blocks)
         
-        driver.quit()
+        process_blocks(blocks)
         
         # Format content in a way compatible with Google Docs structure
         return {
@@ -137,16 +190,15 @@ def scrape_notion_page(url):
                 'content': [{'paragraph': {'elements': [{'textRun': {'content': line}}]}} 
                           for line in content if line.strip()]
             },
-            'revisionId': None  # Notion pages don't provide revision info
+            'revisionId': page.get('last_edited_time')  # Use last_edited_time as revision ID
         }
+    
     except ImportError:
-        logger.error("Selenium is required for scraping Notion pages. Please install selenium package.")
-        raise ValueError("Selenium is required for scraping Notion pages. Please install selenium package.")
+        logger.error("notion-client is required for accessing Notion pages. Please install notion-client package.")
+        raise ValueError("notion-client is required for accessing Notion pages. Please install notion-client package.")
     except Exception as e:
         logger.error(f"Failed to fetch Notion page: {str(e)}")
-        if 'driver' in locals():
-            driver.quit()
-        raise ValueError(f"Failed to fetch Notion page. Ensure the page is publicly accessible: {str(e)}")
+        raise ValueError(f"Failed to fetch Notion page. Ensure you have the correct permissions: {str(e)}")
 
 def is_service_account_available():
     """Check if service account credentials are available."""
