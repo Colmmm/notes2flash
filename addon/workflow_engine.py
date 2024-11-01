@@ -12,7 +12,8 @@ from .process_notes_to_cards import process_notes_to_cards
 from .add_cards_to_anki import add_cards_to_anki
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG, filename='notes2flash.log', filemode='w',
+log_file = os.path.join(addon_folder, "notes2flash.log")
+logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode='w',
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
