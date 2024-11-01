@@ -10,6 +10,7 @@ from .scrape_utils import (
 )
 from .scrape_googledoc import fetch_google_doc_content
 from .scrape_notion import scrape_notion_page
+from .scrape_obsidian import fetch_obsius_content
 
 # Re-export utility functions that other modules depend on
 __all__ = ['scrape_notes', 'mark_document_as_processed', 'get_document_state', 'update_document_state']
@@ -41,6 +42,8 @@ def scrape_notes(stage_config):
             doc_content = fetch_google_doc_content(source_id)
         elif source_type == 'notion':
             doc_content = scrape_notion_page(url)
+        elif source_type == 'obsius':
+            doc_content = fetch_obsius_content(url)
         else:
             raise ValueError(f"Unsupported source type: {source_type}")
         
