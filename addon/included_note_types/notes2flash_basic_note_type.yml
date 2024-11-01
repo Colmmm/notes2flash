@@ -1,0 +1,97 @@
+note_type: "Notes2Flash Basic Note Type"
+
+fields:
+  - "Front"
+  - "Back"
+
+template:
+  front: |
+    <div class="card">
+      <div class="front-content">
+          <h1>{{Front}}</h1>
+      </div>
+    </div>
+
+  back: |
+    <div class="card">
+      <div class="front-content">
+          <h1>{{Front}}</h1>
+      </div>
+      <br>
+      <div class="back-content">
+          <p>{{Back}}</p>
+      </div>
+    </div>
+
+styling: |
+   .card {
+    font-family: 'Arial', sans-serif;
+    padding: 2vh 2vw;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 90vw;
+    max-height: 80vh;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 90vw;
+    }
+
+    /* Adjustments for mobile devices */
+    .mobile .card {
+        padding: 4vh 4vw;
+        font-size: calc(1rem + 2vw);
+    }
+
+    .front-content, .back-content {
+        padding: 20px 10px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        width: 100%;
+        font-size: calc(1rem + 1vw);
+    }
+
+    .front-content h1 {
+        font-size: 3.5rem;
+        font-weight: bold;
+        color: var(--text-color-front);
+    }
+
+    .back-content {
+        background-color: var(--bg-color-back);
+    }
+
+    .back-content p {
+        font-size: 2.5rem;
+        color: var(--text-color-back);
+    }
+
+    /* Adjust colors for light and dark modes */
+    body.nightMode .card {
+        background-color: #333;
+        color: #ccc;
+    }
+    body.nightMode .front-content {
+        background-color: #555;
+    }
+    body.nightMode .back-content {
+        background-color: #444;
+        color: #bbb;
+    }
+
+    /* Default light mode colors */
+    body:not(.nightMode) .card {
+        background-color: #f9f9f9;
+        color: #333;
+    }
+    body:not(.nightMode) .front-content {
+        background-color: #f1f1f1;
+        color: #222;
+    }
+    body:not(.nightMode) .back-content {
+        background-color: #fff;
+        color: #333;
+    }
+ 
