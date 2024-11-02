@@ -1,9 +1,64 @@
 import json
 import logging
+import os
+import yaml
 from aqt import mw
 from anki.notes import Note
 
 logger = logging.getLogger(__name__)
+
+def load_note_type_template(note_type_name):
+    """Load a note type template from the included_note_types directory."""
+    logger.info(f"Looking for note type template: {note_type_name}")
+    
+    # Get the addon directory path
+    addon_dir = os.path.dirname(os.path.abspath(__file__))
+    templates_dir = os.path.join(addon_dir, "included_note_types")
+    
+    # Search through all YAML files in the templates directory
+    for filename in os.listdir(templates_dir):
+        if filename.endswith('.yml'):
+            template_path = os.path.join(templates_dir, filename)
+            try:
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    template = yaml.safe_load(f)
+                    if template.get('note_type') == note_type_name:
+                        logger.info(f"Found matching template in {filename}")
+                        return template
+            except Exception as e:
+                logger.error(f"Error reading template file {filename}: {e}")
+                continue
+    
+    logger.warning(f"No template found for note type: {note_type_name}")
+    return None
+
+def initialize_note_type_from_template(template):
+    """Create a new note type in Anki from a template."""
+    logger.info(f"Initializing note type: {template['note_type']}")
+    
+    # Create a new note type
+    model = mw.col.models.new(template['note_type'])
+    
+    # Add fields
+    for field_name in template['fields']:
+        field = mw.col.models.new_field(field_name)
+        mw.col.models.add_field(model, field)
+    
+    # Add template
+    template_dict = mw.col.models.new_template("Card 1")
+    template_dict['qfmt'] = template['template']['front']
+    template_dict['afmt'] = template['template']['back']
+    mw.col.models.add_template(model, template_dict)
+    
+    # Add styling
+    model['css'] = template['styling']
+    
+    # Add the model to the collection
+    mw.col.models.add(model)
+    mw.col.models.save(model)
+    
+    logger.info(f"Successfully created note type: {template['note_type']}")
+    return model
 
 def check_or_create_deck(deck_name):
     """Check if the deck exists in Anki, if not, create it."""
@@ -28,8 +83,14 @@ def add_note_to_deck(deck_name, note_type_name, fields):
     deck_id = check_or_create_deck(deck_name)
     note_type = mw.col.models.by_name(note_type_name)
 
+    # If note type doesn't exist, try to create it from template
     if not note_type:
-        raise ValueError(f"Note type '{note_type_name}' not found in Anki.")
+        logger.info(f"Note type '{note_type_name}' not found. Attempting to create from template...")
+        template = load_note_type_template(note_type_name)
+        if template:
+            note_type = initialize_note_type_from_template(template)
+        else:
+            raise ValueError(f"Note type '{note_type_name}' not found in Anki and no template available.")
 
     # Create a new note
     note = Note(mw.col, note_type)
