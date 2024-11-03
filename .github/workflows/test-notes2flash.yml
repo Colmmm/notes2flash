@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload logs if failure
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: anki-logs
           path: anki.log
