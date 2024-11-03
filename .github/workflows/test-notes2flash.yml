@@ -51,7 +51,9 @@ jobs:
             libqt6gui6 \
             libqt6widgets6 \
             libqt6webenginecore6 \
-            libqt6webenginewidgets6
+            libqt6webenginewidgets6 \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0  # Add missing dependencies
 
       - name: Download and extract Anki
         run: |
