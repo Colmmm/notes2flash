@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        anki_version: ["23.12.1"]  # Add additional versions as needed
+        anki_version: ["23.12.1"]  
 
     steps:
       - name: Checkout code
@@ -29,13 +29,13 @@ jobs:
       - name: Install required Python libraries
         run: |
           python -m pip install --upgrade pip
-          pip install --target addon/libs -r requirements.txt  # Assumes you have a requirements.txt for your add-on
+          pip install --target addon/libs -r requirements.txt  
 
       - name: Download and extract Anki
         run: |
-          wget https://github.com/ankitects/anki/releases/download/${{ matrix.anki_version }}/anki-${{ matrix.anki_version }}-linux-amd64.tar.bz2 -O anki.tar.bz2
+          wget https://github.com/ankitects/anki/releases/download/${{ matrix.anki_version }}/anki-${{ matrix.anki_version }}-linux-qt6.tar.zst -O anki.tar.zst
           mkdir anki
-          tar -xjf anki.tar.bz2 -C anki --strip-components=1
+          tar -xf anki.tar.zst -C anki --strip-components=1
           chmod +x anki/anki
 
       - name: Install dependencies for Anki
@@ -46,7 +46,7 @@ jobs:
       - name: Install addon
         run: |
           mkdir -p ~/.local/share/Anki2/addons21/notes2flash
-          cp -r $GITHUB_WORKSPACE/* ~/.local/share/Anki2/addons21/notes2flash
+          cp -r addon/* ~/.local/share/Anki2/addons21/notes2flash
 
       - name: Start Anki in headless mode to check for issues
         run: |
