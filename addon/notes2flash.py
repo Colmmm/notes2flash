@@ -1,5 +1,5 @@
 import logging
-from .workflow_engine import WorkflowEngine
+from addon.workflow_engine import WorkflowEngine
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, filename='notes2flash.log', filemode='w',

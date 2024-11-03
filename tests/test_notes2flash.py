@@ -1,15 +1,15 @@
 import sys
 import os
-import unittest
 from pathlib import Path
 import pytest
 
-# Add addon directory to Python path
-addon_dir = str(Path(__file__).parent.parent / 'addon')
-if addon_dir not in sys.path:
-    sys.path.append(addon_dir)
+# Add the project root to Python path
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from notes2flash import notes2flash
+# Import the addon module
+from addon.notes2flash import notes2flash
 
 class TestNotes2Flash:
     """Test notes2flash functionality with different config files"""
