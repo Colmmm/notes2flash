@@ -68,6 +68,7 @@ jobs:
 
       - name: Install addon
         run: |
+          mkdir -p ~/.local/share/Anki2/addons21/notes2flash
           cp -r addon/* ~/.local/share/Anki2/addons21/notes2flash/
 
       - name: Start Xvfb
