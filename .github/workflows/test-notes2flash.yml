@@ -31,6 +31,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install --target addon/libs -r requirements.txt  
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-xinerama0 \
+            xvfb \
+            libegl1 \
+            libgl1-mesa-glx \
+            libgles2-mesa \
+            libnss3 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxi6 \
+            libxtst6 \
+            libxrandr2 \
+            libxss1 \
+            libqt6core6 \
+            libqt6gui6 \
+            libqt6widgets6 \
+            libqt6webenginecore6 \
+            libqt6webenginewidgets6
+
       - name: Download and extract Anki
         run: |
           wget https://github.com/ankitects/anki/releases/download/${{ matrix.anki_version }}/anki-${{ matrix.anki_version }}-linux-qt6.tar.zst -O anki.tar.zst
@@ -38,24 +60,46 @@ jobs:
           tar -xf anki.tar.zst -C anki --strip-components=1
           chmod +x anki/anki
 
-      - name: Install dependencies for Anki
+      - name: Setup Anki configuration
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-xinerama0 xvfb libegl1 libgl1-mesa-glx libgles2-mesa
-
+          mkdir -p ~/.local/share/Anki2/addons21
+          mkdir -p ~/.local/share/Anki2/prefs21.db
+          mkdir -p ~/.local/share/Anki2/User\ 1
 
       - name: Install addon
         run: |
-          mkdir -p ~/.local/share/Anki2/addons21/notes2flash
-          cp -r addon/* ~/.local/share/Anki2/addons21/notes2flash
+          cp -r addon/* ~/.local/share/Anki2/addons21/notes2flash/
 
-      - name: Start Anki in headless mode to check for issues
+      - name: Start Xvfb
         run: |
-          Xvfb :99 -screen 0 1024x768x24 &
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          echo "Started Xvfb"
+          sleep 2
+
+      - name: Start Anki in headless mode
+        run: |
           export DISPLAY=:99
-          ./anki/anki &
-          sleep 10  # Wait for Anki to start
-          pkill anki  # Stop Anki after checking if it starts correctly
+          export QT_DEBUG_PLUGINS=1
+          echo "Starting Anki..."
+          ./anki/anki -p ~/.local/share/Anki2 2>&1 | tee anki.log &
+          sleep 15
+          if ! pgrep -f "anki/anki"; then
+            echo "Anki failed to start or crashed"
+            cat anki.log
+            exit 1
+          fi
+          echo "Anki started successfully"
+          pkill anki || true
+
+      - name: Upload logs if failure
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: anki-logs
+          path: anki.log
 
       - name: Cleanup
-        run: pkill anki || true  # Ensure Anki is not running
+        if: always()
+        run: |
+          pkill Xvfb || true
+          pkill anki || true
