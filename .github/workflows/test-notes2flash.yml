@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        anki_version: ["23.12.1"]  
+        anki_version: ["23.12.1"]
 
     steps:
       - name: Checkout code
@@ -33,31 +33,31 @@ jobs:
 
       - name: Install system dependencies
         run: |
-         sudo apt-get update
-         sudo apt-get install -y \
-         libxcb-xinerama0 \
-         xvfb \
-         libegl1 \
-         libgl1-mesa-glx \
-         libgles2-mesa \
-         libnss3 \
-         libxcomposite1 \
-         libxcursor1 \
-         libxi6 \
-         libxtst6 \
-         libxrandr2 \
-         libxss1 \
-         libqt6core6 \
-         libqt6gui6 \
-         libqt6widgets6 \
-         libqt6webenginecore6 \
-         libqt6webenginewidgets6 \
-         libxcb-icccm4 \
-         libxcb-cursor0 \
-         libxcb-keysyms1 \
-         libxcb-image0 \
-         libxcb-util1 \
-         libxkbcommon-x11-0
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-xinerama0 \
+            xvfb \
+            libegl1 \
+            libgl1-mesa-glx \
+            libgles2-mesa \
+            libnss3 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxi6 \
+            libxtst6 \
+            libxrandr2 \
+            libxss1 \
+            libqt6core6 \
+            libqt6gui6 \
+            libqt6widgets6 \
+            libqt6webenginecore6 \
+            libqt6webenginewidgets6 \
+            libxcb-icccm4 \
+            libxcb-cursor0 \
+            libxcb-keysyms1 \
+            libxcb-image0 \
+            libxcb-util1 \
+            libxkbcommon-x11-0
 
       - name: Download and extract Anki
         run: |
@@ -69,6 +69,8 @@ jobs:
       - name: Setup Anki configuration
         run: |
           mkdir -p ~/.local/share/Anki2/addons21
+          rm -rf ~/.local/share/Anki2/prefs21.db  # Ensure it’s not a directory
+          touch ~/.local/share/Anki2/prefs21.db  # Create prefs21.db as a file
 
       - name: Install addon
         run: |
@@ -84,10 +86,11 @@ jobs:
       - name: Start Anki in headless mode
         run: |
           export DISPLAY=:99
+          export QT_QPA_PLATFORM=minimal  # Use minimal platform to avoid platform plugin issues
           export QT_DEBUG_PLUGINS=1
           echo "Starting Anki..."
           ./anki/anki -p ~/.local/share/Anki2 2>&1 | tee anki.log &
-          sleep 15
+          sleep 20  # Increased sleep time to give Anki more time to start
           if ! pgrep -f "anki/anki"; then
             echo "Anki failed to start or crashed"
             cat anki.log
