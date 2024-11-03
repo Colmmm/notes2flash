@@ -1,0 +1,60 @@
+name: Anki Addon Basic Test
+
+on:
+  push:
+    branches:
+      - main
+      - githubActionsBranch
+  pull_request:
+    branches:
+      - main
+      - githubActionsBranch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        anki_version: ["23.12.1"]  # Add additional versions as needed
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install required Python libraries
+        run: |
+          python -m pip install --upgrade pip
+          pip install --target addon/libs -r requirements.txt  # Assumes you have a requirements.txt for your add-on
+
+      - name: Download and extract Anki
+        run: |
+          wget https://github.com/ankitects/anki/releases/download/${{ matrix.anki_version }}/anki-${{ matrix.anki_version }}-linux-amd64.tar.bz2 -O anki.tar.bz2
+          mkdir anki
+          tar -xjf anki.tar.bz2 -C anki --strip-components=1
+          chmod +x anki/anki
+
+      - name: Install dependencies for Anki
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 xvfb
+
+      - name: Install addon
+        run: |
+          mkdir -p ~/.local/share/Anki2/addons21/notes2flash
+          cp -r $GITHUB_WORKSPACE/* ~/.local/share/Anki2/addons21/notes2flash
+
+      - name: Start Anki in headless mode to check for issues
+        run: |
+          Xvfb :99 -screen 0 1024x768x24 &
+          export DISPLAY=:99
+          ./anki/anki &
+          sleep 10  # Wait for Anki to start
+          pkill anki  # Stop Anki after checking if it starts correctly
+
+      - name: Cleanup
+        run: pkill anki || true  # Ensure Anki is not running
