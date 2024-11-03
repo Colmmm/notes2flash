@@ -105,7 +105,9 @@ jobs:
       - name: Run notes2flash tests
         run: |
           export DISPLAY=:99
-          export PYTHONPATH=$PYTHONPATH:$PWD
+          # Ensure the project root is in PYTHONPATH
+          export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}$PWD"
+          # Run pytest with the config path
           pytest tests/test_notes2flash.py -v --config-path="${{ matrix.config_file }}"
 
       - name: Upload logs if failure
@@ -113,7 +115,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: anki-logs
-          path: anki.log
+          path: |
+            anki.log
+            notes2flash.log
 
       - name: Cleanup
         if: always()
