@@ -1,64 +1,109 @@
-import sys
-import os
-from pathlib import Path
 import pytest
+from pytest_anki import AnkiSession
+import json
+import os
 
-# Add the project root to Python path
-project_root = str(Path(__file__).parent.parent)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+def test_addon_loads(anki_session: AnkiSession):
+    """Test that the notes2flash add-on loads successfully."""
+    with anki_session.profile_loaded():
+        addon = anki_session.load_addon("notes2flash")
+        assert addon is not None
 
-# Import the addon module
-from addon.notes2flash import notes2flash
-
-class TestNotes2Flash:
-    """Test notes2flash functionality with different config files"""
-
-    @pytest.fixture
-    def base_user_inputs(self):
-        """Base user inputs that can be extended per test"""
-        return {}
-
-    def test_notes2flash_with_config(self, config_path, base_user_inputs):
-        """
-        Test notes2flash with a specific config file
+def test_workflow_config_loads(anki_session: AnkiSession, workflow_config):
+    """Test that workflow config loads successfully."""
+    with anki_session.profile_loaded():
+        addon = anki_session.load_addon("notes2flash")
+        from notes2flash.workflow_engine import WorkflowEngine
         
-        Args:
-            config_path: Path to the workflow config file to test
-            base_user_inputs: Fixture providing base user inputs
-        """
+        engine = WorkflowEngine()
+        config = engine.load_workflow_config(workflow_config)
+        
+        assert config is not None
+        assert "workflow_name" in config
+        assert "user_inputs" in config
+        assert "url" in config["user_inputs"]
+        assert "deckname" in config["user_inputs"]
+        assert "scrape_notes" in config
+        assert "process_notes_to_cards" in config
+        assert "add_cards_to_anki" in config
+
+def test_api_keys_configured():
+    """Test that API keys are properly configured."""
+    config_path = os.path.join("addon", "config.json")
+    assert os.path.exists(config_path), "config.json not found"
+    
+    with open(config_path) as f:
+        config = json.load(f)
+    
+    assert "openrouter_api_key" in config, "openrouter_api_key missing from config"
+    assert "notion_api_key" in config, "notion_api_key missing from config"
+    assert len(config["openrouter_api_key"]) > 0, "openrouter_api_key is empty"
+    assert len(config["notion_api_key"]) > 0, "notion_api_key is empty"
+
+def test_workflow_execution(anki_session: AnkiSession, workflow_config, source_config):
+    """Test complete workflow execution with different sources."""
+    with anki_session.profile_loaded():
+        addon = anki_session.load_addon("notes2flash")
+        from notes2flash.notes2flash import notes2flash
+        
+        # Set up user inputs from source config
+        user_inputs = {
+            "url": source_config["url"],
+            "deckname": source_config["deckname"]
+        }
+        
+        # Run workflow
         try:
-            result = notes2flash(
-                workflow_config_path=config_path,
-                user_inputs=base_user_inputs,
-                debug=True
-            )
-            assert isinstance(result, dict), "Expected result to be a dictionary"
+            result = notes2flash(workflow_config, user_inputs)
         except Exception as e:
-            pytest.fail(f"notes2flash failed with config {config_path}: {str(e)}")
+            pytest.fail(f"Workflow execution failed for {source_config['source_type']}: {str(e)}")
+        
+        assert result is not None, f"Workflow returned None for {source_config['source_type']}"
 
-    def test_invalid_inputs(self, config_path):
-        """Test error handling with invalid inputs"""
-        # Test empty config path
-        with pytest.raises(ValueError):
-            notes2flash(
-                workflow_config_path="",
-                user_inputs={}
-            )
+        # Verify deck was created
+        collection = anki_session.collection
+        deck = collection.decks.by_name(user_inputs["deckname"])
+        assert deck is not None, f"Deck '{user_inputs['deckname']}' not created"
 
-        # Test None user inputs
-        with pytest.raises(ValueError):
-            notes2flash(
-                workflow_config_path=config_path,
-                user_inputs=None
-            )
+        # Verify cards were added
+        card_count = collection.card_count()
+        assert card_count > 0, f"No cards added for {source_config['source_type']}"
 
-        # Test non-existent config path
+        # Verify card fields
+        cards = collection.find_cards("")
+        assert len(cards) > 0, f"No cards found for {source_config['source_type']}"
+        
+        for card_id in cards:
+            card = collection.get_card(card_id)
+            note = card.note()
+            
+            # Check required fields exist and are not empty
+            required_fields = ["mandarin", "pinyin", "translation"]
+            for field in required_fields:
+                assert field in note.fields, f"Field '{field}' missing from note"
+                assert len(note[field]) > 0, f"Field '{field}' is empty"
+
+def test_invalid_workflow_config(anki_session: AnkiSession):
+    """Test handling of invalid workflow config."""
+    with anki_session.profile_loaded():
+        addon = anki_session.load_addon("notes2flash")
+        from notes2flash.workflow_engine import WorkflowEngine
+        
+        engine = WorkflowEngine()
+        
         with pytest.raises(Exception):
-            notes2flash(
-                workflow_config_path="non_existent_config.yml",
-                user_inputs={}
-            )
+            engine.load_workflow_config("nonexistent_config.yml")
 
-if __name__ == '__main__':
-    pytest.main([__file__])
+def test_invalid_url(anki_session: AnkiSession, workflow_config):
+    """Test handling of invalid URL."""
+    with anki_session.profile_loaded():
+        addon = anki_session.load_addon("notes2flash")
+        from notes2flash.notes2flash import notes2flash
+        
+        user_inputs = {
+            "url": "https://invalid-url-that-doesnt-exist.com",
+            "deckname": "Test Invalid URL Deck"
+        }
+        
+        with pytest.raises(Exception):
+            notes2flash(workflow_config, user_inputs)
