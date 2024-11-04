@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - githubactionsbranch
+      - githubActionsbranch
   pull_request:
     branches: 
       - main
-      - githubactionsbranch
+      - githubActionsbranch
 
 
 jobs:
