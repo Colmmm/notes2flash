@@ -189,6 +189,41 @@ def process_chunk(chunk: str, prompt: str, model: str, input_data: Dict[str, Any
         logger.error(f"Error processing chunk: {str(e)}")
         return []
 
+def generate_format_reminder(output_fields: List[str]) -> str:
+    """Generate a structured reminder about the expected output format.
+    
+    Args:
+        output_fields: List of required fields for each flashcard dictionary
+        
+    Returns:
+        A formatted string containing the reminder and examples
+    """
+    # Create two example entries using output_fields
+    example_entry_1 = {field: f"example_{field}_1" for field in output_fields}
+    example_entry_2 = {field: f"example_{field}_2" for field in output_fields}
+    
+    # Convert examples to JSON strings, escape curly braces for Python formatting
+    example_json_1 = json.dumps(example_entry_1, indent=4).replace("{", "{{").replace("}", "}}")
+    example_json_2 = json.dumps(example_entry_2, indent=4).replace("{", "{{").replace("}", "}}")
+    
+    # Create the reminder text without using f-strings to avoid formatting issues
+    reminder_text = (
+        "\n**IMPORTANT**\n"
+        "Format the output as a list of dictionaries, where each dictionary represents a flashcard.\n\n"
+        f"Each dictionary must contain exactly these keys: {', '.join(output_fields)}.\n\n"
+        "Strictly adhere to this structure. Any deviation from this format will not be accepted.\n\n"
+        "Example output:\n"
+        "[\n"
+        f"    {example_json_1},\n"
+        f"    {example_json_2},\n"
+        "    ...\n"
+        "]\n"
+    )
+    
+    return reminder_text
+
+
+
 def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[str, Any], 
                 workflow_config: Dict[str, Any], stage_config: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Process a single step in the workflow."""
@@ -199,6 +234,7 @@ def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[
     input_keys = step_config.get('input', [])
     output_name = step_config.get('output', 'flashcards')
     output_fields = step_config.get('output_fields', [])
+    attach_format_reminder = step_config.get('attach_format_reminder', False)
     
     try:
         chunk_size = int(step_config.get('chunk_size', 4000))
@@ -224,6 +260,13 @@ def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[
 
     # Remove any placeholders from the prompt that are not in step_input
     prompt = re.sub(r'\{[^}]*\}', lambda m: m.group(0) if m.group(0)[1:-1] in step_input else '', prompt)
+
+    # Add format reminder if this is the last step and attach_format_reminder is True
+    if attach_format_reminder and step_index == len(stage_config) - 1 and output_fields:
+        format_reminder = generate_format_reminder(output_fields)
+        # Use string concatenation instead of f-string to avoid formatting issues
+        prompt = prompt + "\n" + format_reminder
+        logger.debug("Added format reminder to prompt")
 
     # Verify content key exists in input data
     if content_key not in step_input:
