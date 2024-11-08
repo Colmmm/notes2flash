@@ -185,7 +185,6 @@ def process_chunk(chunk: str, prompt: str, model: str, input_data: Dict[str, Any
         chunk_input[content_key] = chunk
         
         result = call_openrouter_api(prompt, model, chunk_input)
-        logger.debug(f"API result for chunk:" "\n" f"{result}")
         parsed_result = extract_json_from_text(result)
         if parsed_result and isinstance(parsed_result, list):
             return parsed_result
