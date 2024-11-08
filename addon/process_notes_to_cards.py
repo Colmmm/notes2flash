@@ -70,6 +70,8 @@ def call_openrouter_api(prompt, model, input_data):
     # Format the prompt with input data
     try:
         formatted_prompt = prompt.format(**input_data)
+        # Log the formatted prompt in a more readable way
+        logger.info("\nFormatted prompt being sent to API:\n" + "-"*80 + "\n" + formatted_prompt + "\n" + "-"*80)
     except KeyError as e:
         logger.error(f"KeyError while formatting prompt: {str(e)}")
         raise ValueError(f"Missing key in input data: {str(e)}")
@@ -106,7 +108,10 @@ def call_openrouter_api(prompt, model, input_data):
     # Handle the response and return the content
     try:
         result = response.json()
-        return result['choices'][0]['message']['content'].strip()
+        response_content = result['choices'][0]['message']['content'].strip()
+        # Log the API response in a more readable way
+        logger.info("\nAPI Response:\n" + "-"*80 + "\n" + response_content + "\n" + "-"*80)
+        return response_content
     except (KeyError, IndexError) as e:
         logger.error(f"Error parsing API response: {str(e)}")
         raise ValueError(f"Unexpected API response format: {str(e)}")
