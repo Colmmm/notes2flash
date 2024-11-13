@@ -5,11 +5,12 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 
 ## Features
 
-- Scrape notes from Google Docs
-- Process notes using AI models via OpenRouter API
-- Create Anki flashcards with custom templates
-- Flexible workflow system using YAML configuration files
-- Improved error handling and debugging capabilities
+- Compatibility with Google Docs, Notion, and Obsidian
+- Minimum setup to scrape contents of online documents and convert them into Anki flashcards
+- Ability to track document changes
+- Highly customizable flashcard creation process via YAML workflow configuration
+- Control over user inputs, choice of LLM (ChatGPT, Llama, Genmini, and more through OpenRouter.ai)
+- Ability to prompt chain with multiple API calls
 
 ## Installation
 
@@ -18,94 +19,255 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
    ```
    pip install --target addon/libs -r requirements.txt
    ```
+   Alternatively, you can use Docker by running:
+   ```
+   docker-compose up
+   ```
 
-## Usage
+## Setting Up OpenRouter.ai Account
 
-1. Launch Anki and go to Tools > Add-ons > Notes2Flash > Config to set up your OpenRouter API key.
-2. Create a custom workflow configuration file in the `addon/workflow_configs` directory (see example below).
-3. In Anki, go to Tools > Notes2Flash to open the addon interface.
-4. Select your desired workflow configuration from the dropdown menu.
-5. Fill in the required input fields based on the selected workflow.
-6. (Optional) Enable debug mode for more detailed logging.
-7. Click "Submit" to start the flashcard creation process.
+1. Create an OpenRouter.ai account quickly using your Gmail.
+2. Go to the "Keys" section and press "Create Key."
+3. Copy the generated key into the `config.json` of the notes2flash addon:
+   - In Anki, navigate to Tools > Add-ons > Notes2Flash > Config.
+   - Paste the key into the value within quotes by `"openrouter_api_key"`.
+4. If you wish to use paid models, add credits to your account. The minimum top-up is $5 USD, which is recommended for optimal performance, especially for demanding workflows. For a great price/performance model, OpenAI's GPT-4o-mini is highly effective. For example, processing 1 page (500 words) and creating 25 flashcards (1 per sentence on average) would cost approximately $0.0024.
 
-## Creating Custom Workflows
+## Usage with Google Docs
 
-Custom workflows are defined using YAML configuration files. Here's an example structure:
+1. **Public Document**: Make your Google Doc public and use the document ID or URL.
+2. **Google Docs API**: For more control over document privacy, set up the Google Docs API:
+   - Save your account details as `service_account.json` in the addon directory, typically located at `~/.local/share/Anki2/addons21`.
+
+## Usage with Notion
+
+1. **Create a Notion Integration**:
+   - Visit the Notion Developer Portal and select "New Integration."
+   - Provide a name, assign it to your workspace, and set the necessary permissions.
+   - After creation, store the Integration Token securely for authentication.
+2. **Share Notion Pages**:
+   - Navigate to the page you want your integration to access.
+   - Click the "Share" button, select "Invite," and search for your integration by name to grant it access.
+
+## Usage with Obsidian
+
+Compatibility with Obsidian is limited due to the lack of free native public access cloud storage. Scraping is done via the Obsius addon (https://github.com/jonstodle/obsius-obsidian-plugin):
+1. Publish your Obsidian note via the addon to produce a live public version (e.g., https://obsius.site/2v1e5g2j566s7071371k) that can be used as a URL.
+
+## workflow example 1 - General simple example
+here’s a simple example of a yaml workflow configuration:
 
 ```yaml
-workflow_name: "Vocabulary Extraction and Flashcard Generation"
+workflow_name: "barebone notes2flash workflow config example"
 
-user_inputs: [google_doc_id, target_language, native_language, deckname]
+user_inputs: [notes_url]
 
-# 1) **Scrape Notes from Google Docs**
+# 1) **scrape notes from online docs (google docs, notion, obsius)**
 scrape_notes:
-  - doc_id: "{google_doc_id}"
-    output: scraped_notes_output  # Only specifying the output name
+  - url: "{notes_url}"
+    output: scraped_notes_output  # the output name for the scraped notes
 
-# 2) **Process Notes into Flashcards**
+# 2) **process notes into flashcards**
 process_notes_to_cards:
-  - step: "Process notes and create flashcards"
-    model: "meta-llama/llama-3.1-8b-instruct:free"
+  - step: "organize notes and create flashcards"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
+    chunk_size: 4000  # maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
     input:
-      - scraped_notes_output  # Input is the notes content from Google Docs
-      - native_language  # Input is the native language for translation
-      - target_language
-    output: flashcards  # The output should always be a list of dictionaries with the following fields:
+      - scraped_notes_output  # input is the notes content from scrape_notes stage
+    attach_format_reminder: true # if true will append a format reminder to the prompt ensuring api outputs correct format
+    output: flashcards  # the output will always be a list of dictionaries with the following fields:
     output_fields:
-      - vocabulary
-      - translation
+      - question
+      - answer
     prompt: |
-      Extract {target_language} vocabulary from {scraped_notes_output}. Translate it into {native_language}.
-      For each vocabulary word, generate flashcards in the exact format below, where the key for the word should be "vocabulary" and the key for the translation should be "translation". 
-      Do not use any other keys or formats.
+      organize the following notes into flashcards:
+      {scraped_notes_output} 
 
-      Output flashcards in this format:
+#  3)  **add cards to anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # input is the list of flashcards
+  deck_name: "example_deckname"
+  card_template:
+    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
+    front: "{question}"  # the front of the card will show the question
+    back: "{answer}"  # the back of the card will show the answer
+```
+
+### Workflow Explanation
+
+The workflow is divided into three main stages:
+
+1. **Scrape Notes**: In this stage, the `scrape_notes` key is used to specify the source URL from which to scrape the content. The output for the scraped notes is user configurable and defined as `scraped_notes_output` here. This name can be referenced in later stages, allowing you to easily manage and utilize the scraped content in the processing steps.
+
+2. **Process Notes into Flashcards**: This stage takes the output from the `scrape_notes` stage as input. You must specify the output name (`scraped_notes_output` in this case) in the `input` section to ensure the correct data is processed. The model specified will organize the scraped notes and generate flashcards. The output will be a list of dictionaries containing the fields defined in `output_fields`, such as `question` and `answer`. 
+
+   Additionally, if `attach_format_reminder` is set to `True`, a structured reminder will be appended to the end of the prompt. This reminder ensures that the API outputs the data in the expected format for the third stage, which is a list of dictionaries where each dictionary represents a flashcard with the specified `output_fields`. 
+
+   The reminder that would be generated for the above example workflow config would be like the following:
+
+    ```
+    **IMPORTANT**
+    Format the output as a list of dictionaries, where each dictionary represents a flashcard.
+
+    Each dictionary must contain exactly these keys: question, answer.
+
+    Strictly adhere to this structure. Any deviation from this format will not be accepted.
+
+    Example output:
+    [
+        {
+            "question": "example_question_1",
+            "answer": "example_answer_1"
+        },
+        {
+            "question": "example_question_2",
+            "answer": "example_answer_2"
+        },
+        ...
+    ]
+    ``` 
+
+3. **Add Cards to Anki**: In the final stage, the generated flashcards are added to Anki. The `flashcards_data` key takes the output from the previous stage, and you must specify the output name (`flashcards`) to ensure the correct data is added. The card template defines how each flashcard will be structured in Anki.
+
+Save your custom workflow configurations in the `addon/workflow_configs` directory with a `.yml` extension.
+
+
+## workflow example 2 - More user inputs
+The user_inputs key in the config allows you to customize variables that are specified by the user at time before runtime, for example if we add some alterations to the first workflow config by adding some variables to speicify the output anki deckname and also the topic of the notes to give the AI model some context which we can put in the prompt:
+
+```yaml
+workflow_name: "barebone notes2flash workflow config example"
+
+user_inputs: [notes_url, notes_topic, deckname]
+
+# 1) **scrape notes from online docs (google docs, notion, obsius)**
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output  # the output name for the scraped notes
+
+# 2) **process notes into flashcards**
+process_notes_to_cards:
+  - step: "organize notes and create flashcards"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
+    chunk_size: 4000  # maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
+    input:
+      - scraped_notes_output  # input is the notes content from scrape_notes stage
+      - notes_topic # ***NEW INPUT, user input to be added to prompt to give AI context on notes contents
+    attach_format_reminder: true # if true will append a format reminder to the prompt ensuring api outputs correct format
+    output: flashcards  # the output will always be a list of dictionaries with the following fields:
+    output_fields:
+      - question
+      - answer
+    prompt: |
+      organize the following notes of the topic {notes_topic} into flashcards:
+      {scraped_notes_output} 
+
+#  3)  **add cards to anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # input is the list of flashcards
+  deck_name: "{deckname}" #***NEW INPUT, allowing the user to choose outputed deckname 
+  card_template:
+    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
+    front: "{question}"  # the front of the card will show the question
+    back: "{answer}"  # the back of the card will show the answer
+```
+
+## Workflow Example 3 - Prompt Chaining 
+The second stage `process_notes_to_cards` also allows prompt chaining via addition steps. See below for an example workflow that uses two steps/prompts to extract Mandarin vocabulary and then generate example sentences.
+
+```yaml
+workflow_name: "Vocabulary Extraction and Multi-step Processing"
+
+user_inputs: [notes_url, deckname]
+
+# 1) **scrape notes from online docs (google docs, notion, obsius)**
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output  # the output name for the scraped notes
+
+# 2) **Process Notes (Multiple Steps)**
+process_notes_to_cards:
+  - step: "Extract key sentences"
+    model: "openai/gpt-4o-mini"
+    chunk_size: 4000
+    input:
+      - scraped_notes_output
+    attach_format_reminder: true # if true will append a format reminder to the prompt ensuring api outputs correct format
+    output: extracted_keywords  # Intermediate output
+    prompt: |
+      Extract keywords from the following document. The document contains vocabulary words or short phrases in Mandarin. For each keyword, provide its pinyin and English translation. Remove any irrelevant information or duplicates. If there are multiple valid translations for a keyword, choose the most common one.
+
+      Output in the following format:
       [
-        {"vocabulary": "word1", "translation": "translation1"},
-        {"vocabulary": "word2", "translation": "translation2"},
+        {"keyword": "word1", "pinyin": "pinyin1", "translation": "translation1"},
+        {"keyword": "word2", "pinyin": "pinyin2", "translation": "translation2"},
         ...
       ]
-     
+
+      Document:
+      {scraped_notes_output}   
+ 
+    
+  - step: "Generate flashcards"
+    model: "openai/gpt-4o-mini"
+    chunk_size: 4000
+    input:
+      - extracted_keywords  # Input is the extracted keywords
+    attach_format_reminder: false 
+    output: flashcards  # Final output
+    output_fields:
+      - sentence
+      - translation
+      - keywords
+    prompt: |
+      prompt: |
+      For each group of related keywords below, generate an example sentence in Mandarin that naturally uses one or more of the keywords in a contextually appropriate way. If the sentence requires additional Mandarin keywords for clarity, include them as well, provided they aren't commonly known by an upper-intermediate learner.
+
+      Additionally, list the keywords in the format "keyword pinyin translation," using `<br>` as a separator if multiple keywords are included.
+
+      **Important**: The output must be in JSON format where each dictionary has exactly these three keys: "sentence," "translation," and "keywords." Do not change these keys.
+
+      Format the output exactly like this:
+      [
+        {"sentence": "Example sentence in Mandarin.", "translation": "English translation of the sentence.", "keywords": "keyword1 pinyin1 translation1<br>keyword2 pinyin2 translation2"},
+        {"sentence": "Another example sentence in Mandarin.", "translation": "English translation of this sentence.", "keywords": "keywordA pinyinA translationA<br>keywordB pinyinB translationB"},
+        ...
+      ]
+
+      Keywords:
+      {extracted_keywords} 
+   
 #  3)  **Add Cards to Anki**
 add_cards_to_anki:
   flashcards_data: flashcards  # Input is the list of flashcards
   deck_name: "{deckname}"
   card_template:
-    template_name: "Basic"
-    front: "{vocabulary}"
-    back: "{translation}"
-
+    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
+    front: "{sentence}"
+    back: "{translation}<br><br>{keywords}"
 ```
+Only the final step needs to output the 'flashcards_data'-like format ie a list of dicts with keys for the output fields. The outputs corresponding to the intermediate processing steps will be passed into the later steps simply as a string. As such the intermediate steps dont need to specify the keys for `output_fields` or `attach_format_reminder`. Notice for the final step in this example I have `attach_format_reminder: false`, this is because my output field `keywords` has a more complex structure and so it is better to specify the exact structure I want myself.
 
-Save your custom workflow configurations in the `addon/workflow_configs` directory with a `.yml` extension.
-
-## Customizing Workflows
-
-1. **User Inputs**: Specify what information the user needs to provide.
-2. **Scrape Notes**: Configure the Google Doc scraping step.
-3. **Process Notes to Cards**: Define the AI processing step, including the model, input, output, and prompt.
-4. **Add Cards to Anki**: Specify how the flashcards should be added to Anki.
 
 ## Debugging and Troubleshooting
 
-- Enable debug mode in the addon interface for more detailed logging.
-- Check the `notes2flash.log` file in the addon directory for detailed error messages and execution logs.
+- Enable debug mode in the addon interface for detailed logging.
+- Check the `notes2flash.log` file in the addon directory for error messages and execution logs.
 - Use the logs to identify issues in your workflow configuration or API calls.
+- A common error is that the API is not formatting the output properly, it should be a list of dictionaries where each dictionary represents a flashcard with the fields specified in `output_fields`
 
 ## Tips for Creating Effective Workflows
 
 - Ensure your prompts are explicit and clearly define the expected output format.
 - Test your workflows with various types of notes to ensure they work as expected.
 - Use descriptive names for your workflow files to easily identify their purpose.
-- Leverage the flexibility of the system to create workflows for different subjects or study methods.
 
 ## Error Handling
 
-The addon now provides more detailed error messages and logging. If you encounter any issues:
+The addon provides detailed error messages and logging. If you encounter issues:
 
-1. Check the error message displayed in the Anki interface.
-2. Review the `notes2flash.log` file for more detailed information.
+1. Check the error message in the Anki interface.
+2. Review the `notes2flash.log` file for more information.
 3. Ensure your workflow configuration is correct and all required fields are provided.
 4. Verify that your OpenRouter API key is correctly entered in the addon configuration.
 

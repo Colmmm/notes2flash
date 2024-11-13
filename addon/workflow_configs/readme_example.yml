@@ -1,0 +1,33 @@
+workflow_name: "Barebone Notes2Flash Workflow Config Example"
+
+user_inputs: [notes_url]
+
+# 1) **Scrape Notes from online docs (Google docs, Notion, Obsius)**
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output  # The output name for the scraped notes
+
+# 2) **Process Notes into Flashcards**
+process_notes_to_cards:
+  - step: "Organize notes and create flashcards"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
+    chunk_size: 4000  # Maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
+    input:
+      - scraped_notes_output  # Input is the notes content from scrape_notes stage
+    attach_format_reminder: True # If true will append a format reminder to the prompt ensuring API outputs correct format
+    output: flashcards  # The output will always be a list of dictionaries with the following fields:
+    output_fields:
+      - question
+      - answer
+    prompt: |
+      Organize the following notes into flashcards:
+      {scraped_notes_output} 
+
+#  3)  **Add Cards to Anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # Input is the list of flashcards
+  deck_name: "example_deckname"
+  card_template:
+    template_name: "Notes2Flash Basic Note Type" # 'Notes2Flash Basic Note Type' is a default note type included in addon found in ./included_note_types/
+    front: "{question}"  # The front of the card will show the question
+    back: "{answer}"  # The back of the card will show the answer
