@@ -12,6 +12,11 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 - Control over user inputs, choice of LLM (ChatGPT, Llama, Genmini, and more through OpenRouter.ai)
 - Ability to prompt chain with multiple API calls
 
+**Note**: The addon has been tested on the following versions of Anki:
+- 24.06.03 (qt6)
+- 23.12.1 (qt6)
+- 2.1.49
+
 ## Installation
 
 1. Download the addon files and place them in your Anki addons folder.
@@ -19,10 +24,16 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
    ```
    pip install --target addon/libs -r requirements.txt
    ```
+
+
    Alternatively, you can use Docker by running:
    ```
    docker-compose up
    ```
+  Once the process is complete, you can find the generated addon in the `output/notes2flash.ankiaddon` directory.
+  Open Anki and navigate to `Tools -> Add-ons -> Install from file`.
+  Select the `notes2flash.ankiaddon` file from the output directory to install the addon.
+
 
 ## Setting Up OpenRouter.ai Account
 
@@ -51,7 +62,7 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 
 ## Usage with Obsidian
 
-Compatibility with Obsidian is limited due to the lack of free native public access cloud storage. Scraping is done via the Obsius addon (https://github.com/jonstodle/obsius-obsidian-plugin):
+Compatibility with Obsidian is limited due to the lack of free native public access cloud storage. Scraping is done via the Obsius addon https://github.com/jonstodle/obsius-obsidian-plugin (shoutout to the developer!):
 1. Publish your Obsidian note via the addon to produce a live public version (e.g., https://obsius.site/2v1e5g2j566s7071371k) that can be used as a URL.
 
 ## workflow example 1 - General simple example
@@ -272,3 +283,67 @@ The addon provides detailed error messages and logging. If you encounter issues:
 4. Verify that your OpenRouter API key is correctly entered in the addon configuration.
 
 For more detailed information on creating and customizing workflows, troubleshooting, and advanced features, please refer to the documentation in the `docs` folder.
+
+## Contributions
+
+We welcome contributions, whether it's code or useful workflows that you think others would benefit from. 
+
+### Future Features
+
+- Add GitHub Actions for automated workflows.
+- Implement an API to allow restricted but free access to some models, so users don't have to create their own OpenRouter account and pay a minimum of $5.
+- Improve folder structure for workflow configurations by adding subfolders.
+
+### Explanation of Files and Workflow
+
+This project consists of several key files and directories that work together to convert notes into Anki flashcards:
+
+#### Core Files
+- **addon/**: Contains the main application code and configuration files
+  - **__init__.py**: Entry point of the addon
+  - **notes2flash.py**: Core functionality for the addon
+  - **gui.py**: Handles the user interface elements
+  - **config.json**: Stores user configuration including API keys
+  - **manifest.json**: Addon metadata and version information
+  - **process_notes_to_cards.py**: Handles the conversion of notes to flashcard format
+  - **add_cards_to_anki.py**: Manages the integration with Anki's card creation system
+  - **workflow_engine.py**: Orchestrates the execution of workflow configurations
+
+#### Note Source Handlers
+- **addon/scrape_googledoc.py**: Handles extraction from Google Docs
+- **addon/scrape_notion.py**: Handles extraction from Notion
+- **addon/scrape_obsidian.py**: Handles extraction from Obsidian
+- **addon/scrape_utils.py**: Common utilities for note extraction
+- **addon/scrape_notes.py**: Core functionality of scraping process bringing together different source handlers
+
+#### Configuration Files
+- **addon/workflow_configs/**: Contains YAML files that define various workflows for processing notes
+  - Each workflow file specifies the steps for converting specific types of notes to flashcards
+  - Example workflows are provided for different use cases (language learning, general notes, etc.)
+- **addon/included_note_types/**: Contains default note type templates
+- **requirements.txt**: Lists the Python dependencies required for the project
+- **docker-compose.yml**: Used for installing the addon and packaging it where the output will be found in `output/notes2flash.ankiaddon`
+
+#### End-to-End Workflow
+
+1. **Note Extraction**:
+   - When a workflow is triggered, the appropriate scraper (Google Docs, Notion, or Obsidian) extracts content from the source
+   - The scraper handles authentication and formatting of the raw content
+
+2. **Processing Pipeline**:
+   - The workflow engine reads the specified workflow configuration
+   - Notes are processed according to the workflow steps
+   - The LLM model specified in the workflow transforms the content into flashcard format
+   - Multiple processing steps can be chained together for complex transformations
+
+3. **Anki Integration**:
+   - Processed flashcards are created in the specified Anki deck
+   - Card formatting is applied based on the note type template
+   - The addon handles synchronization with Anki's database
+
+4. **Error Handling and Logging**:
+   - All operations are logged to `notes2flash.log`
+   - Errors are caught and displayed in the Anki interface
+   - Debug mode provides detailed information for troubleshooting
+
+
