@@ -347,3 +347,25 @@ This project consists of several key files and directories that work together to
    - Debug mode provides detailed information for troubleshooting
 
 
+## Tracking Changes
+
+The tracking of document changes is managed through the `tracked_docs.json` file. This file is structured as a JSON dictionary where each key corresponds to a document ID that is being tracked. 
+
+### Structure of tracked_docs.json
+
+Each entry in the JSON file contains the following fields:
+- **lines**: An array of lines from the document that are being tracked.
+- **last_updated**: A timestamp indicating when the document was last updated.
+- **version**: The version of the document (if applicable).
+- **successfully_added_to_anki**: A boolean indicating whether the document's content has been successfully added to Anki.
+- **pending_changes**: An array of lines that are pending addition to Anki. Needed when bugs are encountered and you dont want notes2flash to think changes had been added but weren't due to a bug.
+- **source_url**: The URL of the document being tracked.
+- **source_type**: The type of source (e.g., Notion, Google Docs, or Obsius).
+
+### Resetting Tracking
+
+If you wish to reset your tracking, you can simply delete the `tracked_docs.json` file. This will remove all tracking information. 
+
+### Deleting Specific Document Tracking
+
+If you would like to delete tracking for a specific document, you can find the corresponding entry in the `tracked_docs.json` file and remove that entry. This allows you to selectively manage which documents are being tracked without affecting others.
