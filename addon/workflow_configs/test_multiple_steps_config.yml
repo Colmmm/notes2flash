@@ -1,11 +1,11 @@
 workflow_name: "Vocabulary Extraction and Multi-step Processing"
 
-user_inputs: [google_doc_id, deckname]
+user_inputs: [notes_url, deckname]
 
-# 1) **Scrape Notes from Google Docs**
+# 1) **scrape notes from online docs (google docs, notion, obsius)**
 scrape_notes:
-  - doc_id: "{google_doc_id}"
-    output: scraped_notes_output
+  - url: "{notes_url}"
+    output: scraped_notes_output  # the output name for the scraped notes
 
 # 2) **Process Notes (Multiple Steps)**
 process_notes_to_cards:
@@ -14,8 +14,8 @@ process_notes_to_cards:
     chunk_size: 4000
     input:
       - scraped_notes_output
+    attach_format_reminder: true # if true will append a format reminder to the prompt ensuring api outputs correct format
     output: extracted_keywords  # Intermediate output
-    prompt: |
     prompt: |
       Extract keywords from the following document. The document contains vocabulary words or short phrases in Mandarin. For each keyword, provide its pinyin and English translation. Remove any irrelevant information or duplicates. If there are multiple valid translations for a keyword, choose the most common one.
 
@@ -35,6 +35,7 @@ process_notes_to_cards:
     chunk_size: 4000
     input:
       - extracted_keywords  # Input is the extracted keywords
+    attach_format_reminder: false 
     output: flashcards  # Final output
     output_fields:
       - sentence
@@ -63,6 +64,6 @@ add_cards_to_anki:
   flashcards_data: flashcards  # Input is the list of flashcards
   deck_name: "{deckname}"
   card_template:
-    template_name: "Basic"
+    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
     front: "{sentence}"
     back: "{translation}<br><br>{keywords}"
