@@ -122,29 +122,41 @@ def get_document_state(doc_id):
         'last_updated': None,
         'version': None,
         'successfully_added_to_anki': False,
-        'pending_changes': []
+        'pending_changes': [],
+        'source_url': None,
+        'source_type': None
     })
 
-def update_document_state(doc_id, lines, version=None, successfully_added_to_anki=False, pending_changes=None):
+def update_document_state(doc_id, lines, version=None, successfully_added_to_anki=False, pending_changes=None, source_url=None, source_type=None):
     """Update the stored state for a document."""
     tracked_docs = load_tracked_documents()
+    current_state = tracked_docs.get(doc_id, {})
+    
     tracked_docs[doc_id] = {
         'lines': lines,
         'last_updated': datetime.now().isoformat(),
         'version': version,
         'successfully_added_to_anki': successfully_added_to_anki,
-        'pending_changes': pending_changes if pending_changes is not None else []
+        'pending_changes': pending_changes if pending_changes is not None else [],
+        'source_url': source_url if source_url is not None else current_state.get('source_url'),
+        'source_type': source_type if source_type is not None else current_state.get('source_type')
     }
     save_tracked_documents(tracked_docs)
+    logger.info(f"Updated state for document {doc_id}")
 
 def mark_document_as_processed(doc_id):
     """Mark a document as successfully processed."""
     tracked_docs = load_tracked_documents()
     if doc_id in tracked_docs:
-        tracked_docs[doc_id]['successfully_added_to_anki'] = True
-        tracked_docs[doc_id]['pending_changes'] = []
+        # Preserve source_url and source_type while updating status
+        tracked_docs[doc_id].update({
+            'successfully_added_to_anki': True,
+            'pending_changes': []
+        })
         save_tracked_documents(tracked_docs)
         logger.info(f"Document {doc_id} marked as successfully processed")
+    else:
+        logger.warning(f"Attempted to mark non-existent document {doc_id} as processed")
 
 def compare_document_versions(old_lines, new_lines):
     """Compare two versions of document content and return changes."""

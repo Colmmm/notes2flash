@@ -10,6 +10,7 @@ import yaml
 from .scrape_notes import scrape_notes, mark_document_as_processed, get_document_state, update_document_state
 from .process_notes_to_cards import process_notes_to_cards
 from .add_cards_to_anki import add_cards_to_anki
+from .scrape_utils import parse_url
 
 # Get logger from the same namespace as notes2flash
 logger = logging.getLogger("notes2flash")
@@ -84,6 +85,14 @@ class WorkflowEngine:
                 result = scrape_notes(stage_config)
                 output_name = stage_config[0].get('output', 'scraped_notes_output') if isinstance(stage_config, list) else stage_config.get('output', 'scraped_notes_output')
                 self.stage_data[output_name] = result[output_name]
+                
+                # Parse URL to get doc_id and source type
+                url = stage_config[0].get('url') if isinstance(stage_config, list) else stage_config.get('url')
+                if url:
+                    source_info = parse_url(url)
+                    self.stage_data['doc_id'] = source_info['id']
+                    self.stage_data['source_type'] = source_info['type']
+                    self.stage_data['source_url'] = url
             elif stage_name == "process_notes_to_cards":
                 if not isinstance(stage_config, list) or len(stage_config) == 0:
                     raise ValueError("Invalid stage_config for process_notes_to_cards. Expected a non-empty list.")
@@ -95,6 +104,11 @@ class WorkflowEngine:
                 if not isinstance(stage_config, dict):
                     raise ValueError("Invalid stage_config for add_cards_to_anki. Expected a dictionary.")
                 result = add_cards_to_anki(self.stage_data, stage_config)
+                # Check if cards were actually added successfully
+                if result.get('cards_added', 0) == 0 or result.get('errors'):
+                    error_msg = f"Failed to add cards to Anki: {result.get('errors')}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
             else:
                 raise ValueError(f"Unknown stage: {stage_name}")
 
@@ -108,12 +122,8 @@ class WorkflowEngine:
             
             # If there's an error in a stage after scrape_notes, preserve the pending changes
             if stage_name != "scrape_notes":
-                scrape_config = self.workflow_config.get('scrape_notes', {})
-                if isinstance(scrape_config, list):
-                    scrape_config = scrape_config[0]
-                doc_id = scrape_config.get('doc_id')
+                doc_id = self.stage_data.get('doc_id')
                 if doc_id:
-                    doc_id = self.replace_placeholders(doc_id, self.stage_data)
                     doc_state = get_document_state(doc_id)
                     # Keep the pending changes but mark as not processed
                     update_document_state(
@@ -121,7 +131,9 @@ class WorkflowEngine:
                         doc_state['lines'],
                         doc_state['version'],
                         False,
-                        doc_state.get('pending_changes', [])
+                        doc_state.get('pending_changes', []),
+                        self.stage_data.get('source_url'),
+                        self.stage_data.get('source_type')
                     )
             
             raise
@@ -148,15 +160,15 @@ class WorkflowEngine:
                 logger.debug(f"Stage data after {stage}: {self.stage_data}")
 
             # After successful completion of all stages, mark the document as successfully processed
-            scrape_config = self.workflow_config.get('scrape_notes', {})
-            if isinstance(scrape_config, list):
-                scrape_config = scrape_config[0]
-            doc_id = scrape_config.get('doc_id')
+            doc_id = self.stage_data.get('doc_id')
+            logger.debug(f"Document ID for marking as processed: {doc_id}")
             if doc_id:
-                # Replace any placeholders in doc_id
-                doc_id = self.replace_placeholders(doc_id, self.stage_data)
-                mark_document_as_processed(doc_id)  # This will also clear pending changes
-                logger.info(f"Marked document {doc_id} as successfully processed")
+                # Only mark as processed if we actually added cards successfully
+                if self.stage_data.get('cards_added', 0) > 0:
+                    mark_document_as_processed(doc_id)  # This will also clear pending changes
+                    logger.info(f"Marked document {doc_id} as successfully processed")
+                else:
+                    logger.warning(f"No cards were added for document {doc_id}, not marking as processed")
 
             logger.info("Workflow completed successfully")
             if progress_callback:
