@@ -6,7 +6,7 @@ import re
 import os
 from typing import List, Dict, Any, Optional, Tuple
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("notes2flash")
 
 def get_api_key_from_config():
     """Read the OpenRouter API key from the addon's config file."""

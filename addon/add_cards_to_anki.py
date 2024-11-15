@@ -5,7 +5,7 @@ import yaml
 from aqt import mw
 from anki.notes import Note
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("notes2flash")
 
 def load_note_type_template(note_type_name):
     """Load a note type template from the included_note_types directory."""

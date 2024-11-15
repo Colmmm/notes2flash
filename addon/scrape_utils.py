@@ -13,7 +13,7 @@ if libs_path not in sys.path:
     sys.path.insert(0, libs_path)
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("notes2flash")
 
 # Path to config and tracked docs files
 current_dir = os.path.dirname(__file__)

@@ -39,7 +39,7 @@ echo "Bundling the addon using Docker Compose..."
 docker-compose up $BUILD_FLAG --exit-code-from addon_bundler
 
 # Step 2: Define paths
-ANKI_DIR="Anki_23.12.1"
+ANKI_DIR="Anki_24.06.3"
 ANKI_BASE="${ANKI_DIR}/anki_config"
 ADDON_DIR="${ANKI_BASE}/addons21/notes2flash"
 BUNDLED_ZIP="output/notes2flash.ankiaddon"

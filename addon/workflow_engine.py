@@ -11,8 +11,8 @@ from .scrape_notes import scrape_notes, mark_document_as_processed, get_document
 from .process_notes_to_cards import process_notes_to_cards
 from .add_cards_to_anki import add_cards_to_anki
 
-# Get logger for this module
-logger = logging.getLogger(__name__)
+# Get logger from the same namespace as notes2flash
+logger = logging.getLogger("notes2flash")
 
 class WorkflowEngine:
     def __init__(self, workflow_config, user_inputs, debug=False):

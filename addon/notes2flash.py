@@ -2,12 +2,31 @@ import logging
 import os
 from .workflow_engine import WorkflowEngine
 
-# Set up logging
-addon_folder = os.path.dirname(__file__)
-log_file = os.path.join(addon_folder, "notes2flash.log")
-logging.basicConfig(level=logging.INFO, filename=log_file, filemode='w',
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Set up custom logger
+def setup_logger():
+    addon_folder = os.path.dirname(__file__)
+    log_file = os.path.join(addon_folder, "notes2flash.log")
+    
+    # Create logger
+    logger = logging.getLogger("notes2flash")
+    logger.setLevel(logging.INFO)
+    
+    # Create file handler
+    file_handler = logging.FileHandler(log_file, mode='w')
+    file_handler.setLevel(logging.INFO)
+    
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    
+    # Add handler to logger if it doesn't already have handlers
+    if not logger.handlers:
+        logger.addHandler(file_handler)
+    
+    return logger
+
+# Initialize logger
+logger = setup_logger()
 
 def notes2flash(workflow_config_path, user_inputs, progress_callback=None, debug=False):
     """
