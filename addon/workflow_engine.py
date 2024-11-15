@@ -11,10 +11,7 @@ from .scrape_notes import scrape_notes, mark_document_as_processed, get_document
 from .process_notes_to_cards import process_notes_to_cards
 from .add_cards_to_anki import add_cards_to_anki
 
-# Set up logging
-log_file = os.path.join(addon_folder, "notes2flash.log")
-logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode='w',
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Get logger for this module
 logger = logging.getLogger(__name__)
 
 class WorkflowEngine:

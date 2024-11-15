@@ -1,8 +1,11 @@
 import logging
+import os
 from .workflow_engine import WorkflowEngine
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, filename='notes2flash.log', filemode='w',
+addon_folder = os.path.dirname(__file__)
+log_file = os.path.join(addon_folder, "notes2flash.log")
+logging.basicConfig(level=logging.INFO, filename=log_file, filemode='w',
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
