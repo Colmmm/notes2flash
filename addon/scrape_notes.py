@@ -61,7 +61,7 @@ def scrape_notes(stage_config):
         if not prev_lines:
             logger.info(f"New document detected. Initializing tracking for document ID: {source_id}")
             content_str = '\n\n'.join(current_lines)
-            update_document_state(source_id, current_lines, current_version, False, current_lines)
+            update_document_state(source_id, current_lines, current_version, False, current_lines, url, source_type)
             return {output_key: content_str}
 
         # Compare versions and get changes
@@ -72,7 +72,7 @@ def scrape_notes(stage_config):
             logger.info(f"Found {changes['total_changes']} changes in document {source_id}")
             lines_to_process = changes['added'] + changes['modified']
             content_str = '\n\n'.join(lines_to_process)
-            update_document_state(source_id, current_lines, current_version, False, lines_to_process)
+            update_document_state(source_id, current_lines, current_version, False, lines_to_proces, url, source_type)
             return {output_key: content_str}
         
         # If there are pending changes from a previous failed attempt, process only those
