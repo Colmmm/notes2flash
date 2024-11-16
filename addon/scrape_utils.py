@@ -65,7 +65,7 @@ def parse_url(url):
             return {'type': 'google_docs', 'id': doc_id}
     
     # Handle Notion URLs
-    elif 'notion.site' in parsed.netloc:
+    elif 'notion.site' in parsed.netloc or 'notion.so' in parsed.netloc:
         # Extract page ID (last part of the URL)
         page_id = parsed.path.split('-')[-1]  # Get the last part after the last hyphen
         if page_id:
