@@ -231,7 +231,6 @@ process_notes_to_cards:
       - translation
       - keywords
     prompt: |
-      prompt: |
       For each group of related keywords below, generate an example sentence in Mandarin that naturally uses one or more of the keywords in a contextually appropriate way. If the sentence requires additional Mandarin keywords for clarity, include them as well, provided they aren't commonly known by an upper-intermediate learner.
 
       Additionally, list the keywords in the format "keyword pinyin translation," using `<br>` as a separator if multiple keywords are included.

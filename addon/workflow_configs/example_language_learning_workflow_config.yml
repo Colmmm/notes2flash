@@ -1,0 +1,42 @@
+workflow_name: "Example Language Learning Workflow Config"
+
+user_inputs: [notes_url, target_language, native_language, deckname]
+
+# 1) **Scrape Notes from online docs (Google docs, Notion, Obsius)**
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output  # The output name for the scraped notes
+
+# 2) **Process Notes into Flashcards**
+process_notes_to_cards:
+  - step: "Organize notes and create flashcards"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
+    chunk_size: 4000  # Maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
+    input:
+      - scraped_notes_output  # Input is the notes content from scrape_notes stage
+    attach_format_reminder: True # If true will append a format reminder to the prompt ensuring API outputs correct format
+    output: flashcards  # The output will always be a list of dictionaries with the following fields:
+    output_fields:
+      - front
+      - back
+    prompt: |
+      Create flashcards for learning {target_language}. The learner's native language is {native_language}. Each flashcard should focus on one key concept or sentence and follow this structure:
+
+      Include the text or concept in {target_language} as the primary content.
+      Provide a clear and concise translation or explanation in {native_language}.
+      If applicable, include a pronunciation guide for the target language (e.g., phonetic transcription or audio example).
+      Optionally, add a cultural or contextual note to enhance understanding.
+
+      Ensure the flashcards are well-structured for easy import into a flashcard app, including fields for 'Front', 'Back', and 'Optional Notes.'
+
+      The input notes are as follows:
+      {scraped_notes_output} 
+
+#  3)  **Add Cards to Anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # Input is the list of flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Notes2Flash Basic Note Type" # 'Notes2Flash Basic Note Type' is a default note type included in addon found in ./included_note_types/
+    front: "{front}"  # The front of the card will show the question
+    back: "{back}"  # The back of the card will show the answer
