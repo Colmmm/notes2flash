@@ -35,7 +35,8 @@ class Notes2FlashWorker(QThread):
             error_message = f"An error occurred: {str(e)}"
             if self.debug_mode:
                 try:
-                    with open('notes2flash.log', 'r') as log_file:
+                    log_file = os.path.join(os.path.dirname(__file__), "notes2flash.log")
+                    with open(log_file, 'r') as log_file:
                         error_message += "\n\nDebug information:\n" + log_file.read()
                 except:
                     error_message += "\n\nCould not read debug log."
