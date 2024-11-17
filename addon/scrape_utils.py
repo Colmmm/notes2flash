@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import difflib
+from aqt import mw
 
 # Add the path to the `libs` directory where extra packages are bundled
 addon_folder = os.path.dirname(__file__)
@@ -21,11 +22,46 @@ SERVICE_ACCOUNT_FILE = os.path.join(current_dir, "service_account.json")
 TRACKED_DOCS_FILE = os.path.join(current_dir, "tracked_docs.json")
 CONFIG_FILE = os.path.join(current_dir, "config.json")
 
+def get_addon_id():
+    """Get the addon ID (directory name) for this addon."""
+    return os.path.basename(current_dir)
+
 def load_config():
-    """Load configuration from config.json."""
+    """Load configuration from Anki's addon manager or config.json."""
     try:
-        with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
+        addon_id = get_addon_id()
+        
+        # First try to get config from Anki's addon manager
+        meta_config = mw.addonManager.getConfig(addon_id)
+        
+        if meta_config is not None:
+            # If meta_config has a 'config' key, use that
+            if isinstance(meta_config, dict) and 'config' in meta_config:
+                config = meta_config['config']
+            else:
+                config = meta_config
+            # Sync to config.json
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(config, f, indent=4)
+            return config
+        
+        # If no config in addon manager, try loading from config.json
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+            # Wrap in meta.json structure if needed
+            meta_config = {
+                "name": "Notes2Flash",
+                "disabled": False,
+                "config": config
+            }
+            # Sync config.json to addon manager
+            mw.addonManager.writeConfig(addon_id, meta_config)
+            return config
+        
+        # If neither exists, return empty config
+        return {}
+        
     except Exception as e:
         logger.error(f"Failed to load config: {str(e)}")
         return {}

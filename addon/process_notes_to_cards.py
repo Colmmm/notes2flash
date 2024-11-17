@@ -5,19 +5,23 @@ import logging
 import re
 import os
 from typing import List, Dict, Any, Optional, Tuple
+from .scrape_utils import load_config
 
 logger = logging.getLogger("notes2flash")
 
 def get_api_key_from_config():
-    """Read the OpenRouter API key from the addon's config file."""
-    addon_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(addon_dir, "config.json")
+    """Read the OpenRouter API key from the addon's config."""
     try:
-        with open(config_path, 'r') as config_file:
-            config = json.load(config_file)
+        config = load_config()
+        # If its loading from config.json, the API key is a direct key
+        if isinstance(config, dict) and 'openrouter_api_key' in config:
+            return config['openrouter_api_key']
+        # The config from meta.json has the API key under the 'config' key
+        if isinstance(config, dict) and 'config' in config:
+            config = config['config']
         api_key = config.get('openrouter_api_key')
         if not api_key:
-            raise ValueError("OpenRouter API key not found in config.json")
+            raise ValueError("OpenRouter API key not found in config")
         return api_key
     except Exception as e:
         logger.error(f"Error reading API key from config: {str(e)}")
