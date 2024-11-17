@@ -15,7 +15,7 @@ def scrape_notion_page(url):
         notion_api_key = config.get('notion_api_key')
         
         if not notion_api_key:
-            raise ValueError("Notion API key not found in config.json. Please add your integration token.")
+            raise ValueError("Notion API key not found in configuration. Please add your integration token through Anki's addon configuration.")
         
         # Initialize Notion client
         notion = Client(auth=notion_api_key)

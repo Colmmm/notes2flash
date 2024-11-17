@@ -99,7 +99,7 @@ add_cards_to_anki:
   flashcards_data: flashcards  # input is the list of flashcards
   deck_name: "example_deckname"
   card_template:
-    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
+    template_name: "Notes2flash Basic Note Type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
     front: "{question}"  # the front of the card will show the question
     back: "{answer}"  # the back of the card will show the answer
 ```
@@ -178,7 +178,7 @@ add_cards_to_anki:
   flashcards_data: flashcards  # input is the list of flashcards
   deck_name: "{deckname}" #***NEW INPUT, allowing the user to choose outputed deckname 
   card_template:
-    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
+    template_name: "Notes2flash Basic Note Type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
     front: "{question}"  # the front of the card will show the question
     back: "{answer}"  # the back of the card will show the answer
 ```
@@ -257,7 +257,7 @@ add_cards_to_anki:
   flashcards_data: flashcards
   deck_name: "{deckname}"
   card_template:
-    template_name: "notes2flash basic note type"
+    template_name: "Notes2flash Basic Note Type"
     front: "{sentence}"
     back: "{translation}<br><br>{keywords}"
 ```

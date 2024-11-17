@@ -15,6 +15,9 @@ def load_note_type_template(note_type_name):
     addon_dir = os.path.dirname(os.path.abspath(__file__))
     templates_dir = os.path.join(addon_dir, "included_note_types")
     
+    # Convert note type name to lowercase for case-insensitive comparison
+    note_type_name_lower = note_type_name.lower()
+    
     # Search through all YAML files in the templates directory
     for filename in os.listdir(templates_dir):
         if filename.endswith('.yml'):
@@ -22,7 +25,8 @@ def load_note_type_template(note_type_name):
             try:
                 with open(template_path, 'r', encoding='utf-8') as f:
                     template = yaml.safe_load(f)
-                    if template.get('note_type') == note_type_name:
+                    # Compare note type names case-insensitively
+                    if template.get('note_type', '').lower() == note_type_name_lower:
                         logger.info(f"Found matching template in {filename}")
                         return template
             except Exception as e:
@@ -125,7 +129,7 @@ def add_cards_to_anki(stage_data, stage_config):
         return {"cards_added": 0, "error": "Deck name not provided"}
 
     card_template = stage_config.get('card_template', {})
-    template_name = card_template.get('template_name', 'Basic')
+    template_name = card_template.get('template_name', 'Notes2Flash Basic Note Type')
 
     # Ensure the deck exists
     check_or_create_deck(deck_name)

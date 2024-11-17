@@ -68,6 +68,6 @@ add_cards_to_anki:
   flashcards_data: flashcards
   deck_name: "{deckname}"
   card_template:
-    template_name: "notes2flash basic note type"
+    template_name: "Notes2Flash Basic Note Type"
     front: "{sentence}"
     back: "{translation}<br><br>{keywords}"
