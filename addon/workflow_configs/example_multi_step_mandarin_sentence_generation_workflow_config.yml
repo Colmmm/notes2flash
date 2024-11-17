@@ -10,7 +10,7 @@ scrape_notes:
 # 2) Process Notes to Extract Vocabulary and Generate Flashcards
 process_notes_to_cards:
   - step: "Extract vocabulary and phrases"
-    model: "openai/gpt-4o-mini"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
     chunk_size: 4000
     input:
       - scraped_notes_output
@@ -33,7 +33,7 @@ process_notes_to_cards:
       {scraped_notes_output}
     
   - step: "Generate example sentences and flashcards"
-    model: "openai/gpt-4o-mini"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
     chunk_size: 4000
     input:
       - extracted_vocabulary

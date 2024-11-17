@@ -57,6 +57,20 @@ def split_content_into_chunks(content: str, chunk_size: int) -> List[str]:
 
     return chunks
 
+def format_prompt_safely(prompt: str, input_data: Dict[str, Any]) -> str:
+    """Safely format a prompt by only replacing {variable} patterns that match input_data keys."""
+    def replace_var(match):
+        var_name = match.group(1)
+        # Only replace if it's a variable name in our input data
+        if var_name in input_data:
+            return str(input_data[var_name])
+        # Otherwise return the original match
+        return match.group(0)
+    
+    # Only match {variable} patterns that aren't part of JSON
+    pattern = r'(?<!["{\w])\{([^{}]+)\}(?![\w}"])'
+    return re.sub(pattern, replace_var, prompt)
+
 def call_openrouter_api(prompt, model, input_data):
     """Send a request to the OpenRouter API for processing notes."""
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -67,14 +81,14 @@ def call_openrouter_api(prompt, model, input_data):
         logger.error(f"Failed to get API key: {str(e)}")
         raise
 
-    # Format the prompt with input data
+    # Format the prompt with input data using our safe formatter
     try:
-        formatted_prompt = prompt.format(**input_data)
+        formatted_prompt = format_prompt_safely(prompt, input_data)
         # Log the formatted prompt in a more readable way
         logger.info("\nFormatted prompt being sent to API:\n" + "-"*80 + "\n" + formatted_prompt + "\n" + "-"*80)
-    except KeyError as e:
-        logger.error(f"KeyError while formatting prompt: {str(e)}")
-        raise ValueError(f"Missing key in input data: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error formatting prompt: {str(e)}")
+        raise ValueError(f"Error formatting prompt: {str(e)}")
 
     # Define the data payload for the API request
     data = {
@@ -206,11 +220,11 @@ def generate_format_reminder(output_fields: List[str]) -> str:
     example_entry_1 = {field: f"example_{field}_1" for field in output_fields}
     example_entry_2 = {field: f"example_{field}_2" for field in output_fields}
     
-    # Convert examples to JSON strings, escape curly braces for Python formatting
-    example_json_1 = json.dumps(example_entry_1, indent=4).replace("{", "{{").replace("}", "}}")
-    example_json_2 = json.dumps(example_entry_2, indent=4).replace("{", "{{").replace("}", "}}")
+    # Convert examples to JSON strings with proper escaping
+    example_json_1 = json.dumps(example_entry_1, indent=4)
+    example_json_2 = json.dumps(example_entry_2, indent=4)
     
-    # Create the reminder text without using f-strings to avoid formatting issues
+    # Create the reminder text
     reminder_text = (
         "\n**IMPORTANT**\n"
         "Format the output as a list of dictionaries, where each dictionary represents a flashcard.\n\n"
@@ -218,15 +232,13 @@ def generate_format_reminder(output_fields: List[str]) -> str:
         "Strictly adhere to this structure. Any deviation from this format will not be accepted.\n\n"
         "Example output:\n"
         "[\n"
-        f"    {example_json_1},\n"
-        f"    {example_json_2},\n"
+        f"{example_json_1},\n"
+        f"{example_json_2},\n"
         "    ...\n"
         "]\n"
     )
     
     return reminder_text
-
-
 
 def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[str, Any], 
                 workflow_config: Dict[str, Any], stage_config: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -245,7 +257,6 @@ def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[
         logger.info(f"Using chunk size: {chunk_size}")
     except (ValueError, TypeError) as e:
         logger.warning(f"Invalid chunk_size in config, using default of 4000 chars: {str(e)}")
-        chunk_size = 4000
 
     # Get content key from previous step
     content_key, source = get_content_key_from_previous_step(step_index, stage_config, workflow_config)
@@ -265,7 +276,6 @@ def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[
     # Add format reminder if this is the last step and attach_format_reminder is True
     if attach_format_reminder and step_index == len(stage_config) - 1 and output_fields:
         format_reminder = generate_format_reminder(output_fields)
-        # Use string concatenation instead of f-string to avoid formatting issues
         prompt = prompt + "\n" + format_reminder
         logger.debug("Added format reminder to prompt")
 
