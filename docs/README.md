@@ -191,53 +191,58 @@ workflow_name: "Vocabulary Extraction and Multi-step Processing"
 
 user_inputs: [notes_url, deckname]
 
-# 1) **scrape notes from online docs (google docs, notion, obsius)**
+# 1) Scrape Notes from Online Docs
 scrape_notes:
   - url: "{notes_url}"
-    output: scraped_notes_output  # the output name for the scraped notes
+    output: scraped_notes_output  # The raw notes from the provided URL
 
-# 2) **Process Notes (Multiple Steps)**
+# 2) Process Notes to Extract Vocabulary and Generate Flashcards
 process_notes_to_cards:
-  - step: "Extract key sentences"
-    model: "openai/gpt-4o-mini"
+  - step: "Extract vocabulary and phrases"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
     chunk_size: 4000
     input:
       - scraped_notes_output
-    attach_format_reminder: true # if true will append a format reminder to the prompt ensuring api outputs correct format
-    output: extracted_keywords  # Intermediate output
+    attach_format_reminder: true
+    output: extracted_vocabulary  # Consistent naming for intermediate vocabulary output
     prompt: |
-      Extract keywords from the following document. The document contains vocabulary words or short phrases in Mandarin. For each keyword, provide its pinyin and English translation. Remove any irrelevant information or duplicates. If there are multiple valid translations for a keyword, choose the most common one.
+      Extract vocabulary and phrases from the following document. The document contains Mandarin keywords or short phrases. For each item, provide:
+      - The Mandarin word or phrase.
+      - Its pinyin representation.
+      - Its English translation.
 
-      Output in the following format:
+      Ignore irrelevant content and remove duplicates. If there are multiple valid translations, select the most commonly used one. Ensure the output strictly follows this JSON format:
       [
-        {"keyword": "word1", "pinyin": "pinyin1", "translation": "translation1"},
-        {"keyword": "word2", "pinyin": "pinyin2", "translation": "translation2"},
+        {"mandarin": "word1", "pinyin": "pinyin1", "translation": "translation1"},
+        {"mandarin": "word2", "pinyin": "pinyin2", "translation": "translation2"},
         ...
       ]
 
       Document:
-      {scraped_notes_output}   
- 
+      {scraped_notes_output}
     
-  - step: "Generate flashcards"
-    model: "openai/gpt-4o-mini"
+  - step: "Generate example sentences and flashcards"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
     chunk_size: 4000
     input:
-      - extracted_keywords  # Input is the extracted keywords
-    attach_format_reminder: false 
-    output: flashcards  # Final output
+      - extracted_vocabulary
+    attach_format_reminder: false
+    output: flashcards
     output_fields:
       - sentence
       - translation
       - keywords
     prompt: |
-      For each group of related keywords below, generate an example sentence in Mandarin that naturally uses one or more of the keywords in a contextually appropriate way. If the sentence requires additional Mandarin keywords for clarity, include them as well, provided they aren't commonly known by an upper-intermediate learner.
+      Use the vocabulary below to generate example sentences in Mandarin. Each sentence should:
+      - Naturally incorporate one or more keywords.
+      - Include additional context or keywords if necessary for clarity (only if not commonly known by an upper-intermediate learner).
 
-      Additionally, list the keywords in the format "keyword pinyin translation," using `<br>` as a separator if multiple keywords are included.
+      For each sentence, provide:
+      - The Mandarin sentence.
+      - Its English translation.
+      - A list of keywords in the format "keyword pinyin translation" separated by `<br>` for multiple keywords.
 
-      **Important**: The output must be in JSON format where each dictionary has exactly these three keys: "sentence," "translation," and "keywords." Do not change these keys.
-
-      Format the output exactly like this:
+      Ensure the output strictly follows this JSON format:
       [
         {"sentence": "Example sentence in Mandarin.", "translation": "English translation of the sentence.", "keywords": "keyword1 pinyin1 translation1<br>keyword2 pinyin2 translation2"},
         {"sentence": "Another example sentence in Mandarin.", "translation": "English translation of this sentence.", "keywords": "keywordA pinyinA translationA<br>keywordB pinyinB translationB"},
@@ -245,14 +250,14 @@ process_notes_to_cards:
       ]
 
       Keywords:
-      {extracted_keywords} 
-   
-#  3)  **Add Cards to Anki**
+      {extracted_vocabulary}
+
+# 3) Add Cards to Anki
 add_cards_to_anki:
-  flashcards_data: flashcards  # Input is the list of flashcards
+  flashcards_data: flashcards
   deck_name: "{deckname}"
   card_template:
-    template_name: "notes2flash basic note type" # 'notes2flash basic note type' is a default note type included in addon found in ./included_note_types/
+    template_name: "notes2flash basic note type"
     front: "{sentence}"
     back: "{translation}<br><br>{keywords}"
 ```
