@@ -262,9 +262,6 @@ def process_step(step_index: int, step_config: Dict[str, Any], stage_data: Dict[
     
     logger.debug(f"Step input: {step_input}")
 
-    # Remove any placeholders from the prompt that are not in step_input
-    prompt = re.sub(r'\{[^}]*\}', lambda m: m.group(0) if m.group(0)[1:-1] in step_input else '', prompt)
-
     # Add format reminder if this is the last step and attach_format_reminder is True
     if attach_format_reminder and step_index == len(stage_config) - 1 and output_fields:
         format_reminder = generate_format_reminder(output_fields)
