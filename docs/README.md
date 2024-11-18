@@ -20,7 +20,7 @@ AI-powered application to organize online notes (Google Doc, Notion, Obsidian) a
 ## Installation
 
 ### Option 1: Install via Ankiweb (Recommended)
-1. Visit the addon's [Ankiweb page](https://ankiweb.net/shared/info/868678030?cb=1731942628370)
+1. Visit the addon's [Ankiweb page](https://ankiweb.net/shared/info/868678030)
 2. Copy the addon code:
    ```
    868678030
