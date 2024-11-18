@@ -72,7 +72,7 @@ def scrape_notes(stage_config):
             logger.info(f"Found {changes['total_changes']} changes in document {source_id}")
             lines_to_process = changes['added'] + changes['modified']
             content_str = '\n\n'.join(lines_to_process)
-            update_document_state(source_id, current_lines, current_version, False, lines_to_proces, url, source_type)
+            update_document_state(source_id, current_lines, current_version, False, lines_to_process, url, source_type)
             return {output_key: content_str}
         
         # If there are pending changes from a previous failed attempt, process only those
