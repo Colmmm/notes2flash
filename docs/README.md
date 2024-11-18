@@ -1,7 +1,7 @@
-# notes2flash
-AI-powered application to organize Google Doc notes and convert them into Anki flashcards.
+# Notes2Flash
+AI-powered application to organize online notes (Google Doc, Notion, Obsidian) and convert them into Anki flashcards.
 
-![Notes2Flash Demo](notes2flash_demo.gif)
+![Notes2Flash Demo](https://github.com/Colmmm/notes2flash/raw/main/docs/notes2flash_demo.gif)
 
 ## Features
 
@@ -19,25 +19,27 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 
 ## Installation
 
-1. Download the addon files and place them in your Anki addons folder.
-2. Install the required dependencies by running:
-   ```
-   pip install --target addon/libs -r requirements.txt
-   ```
+### 1) Install via Ankiweb (Recommended)
+Addon's [Ankiweb](https://ankiweb.net/shared/info/868678030?cb=1731942628370)
+Copy and paste the below addon code into Anki:
+    ```
+    868678030
+    ```
 
-
-   Alternatively, you can use Docker by running:
+### 2) Install via source
+Source code is hosted on GitHub here: [GitHub](https://github.com/Colmmm/notes2flash)
+To bundle and zip the addon you can use docker and docker-compose:
    ```
    docker-compose up
    ```
-  Once the process is complete, you can find the generated addon in the `output/notes2flash.ankiaddon` directory.
-  Open Anki and navigate to `Tools -> Add-ons -> Install from file`.
-  Select the `notes2flash.ankiaddon` file from the output directory to install the addon.
+Once the process is complete, you can find the generated addon in the `output/notes2flash.ankiaddon` directory.
+Open Anki and navigate to `Tools -> Add-ons -> Install from file`.
+Select the `notes2flash.ankiaddon` file from the output directory to install the addon.
 
 
-## Setting Up OpenRouter.ai Account
+## Setting Up OpenRouter.ai Account (***Requirement)
 
-1. Create an OpenRouter.ai account quickly using your Gmail.
+1. Create an OpenRouter.ai account quickly using your Gmail or other means: [OpenRouter.ai](https://openrouter.ai/)
 2. Go to the "Keys" section and press "Create Key."
 3. Copy the generated key into the `config.json` of the notes2flash addon:
    - In Anki, navigate to Tools > Add-ons > Notes2Flash > Config.
@@ -50,7 +52,7 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 2. **Google Docs API**: For more control over document privacy, set up the Google Docs API:
    - Save your account details as `service_account.json` in the addon directory, typically located at `~/.local/share/Anki2/addons21`.
 
-## Usage with Notion
+## Usage with Notion (***Actions required if want to use Notion docs)
 
 1. **Create a Notion Integration**:
    - Visit the Notion Developer Portal and select "New Integration."
@@ -62,11 +64,11 @@ AI-powered application to organize Google Doc notes and convert them into Anki f
 
 ## Usage with Obsidian
 
-Compatibility with Obsidian is limited due to the lack of free native public access cloud storage. Scraping is done via the Obsius addon https://github.com/jonstodle/obsius-obsidian-plugin (shoutout to the developer!):
+Compatibility with Obsidian is limited due to the lack of free native public access cloud storage. Scraping is done via the Obsius addon [Obsius addon](https://github.com/jonstodle/obsius-obsidian-plugin) (shoutout to the developer!):
 1. Publish your Obsidian note via the addon to produce a live public version (e.g., https://obsius.site/2v1e5g2j566s7071371k) that can be used as a URL.
 
 ## workflow example 1 - General simple example
-here’s a simple example of a yaml workflow configuration:
+Here’s a simple example of a yaml workflow configuration:
 
 ```yaml
 workflow_name: "barebone notes2flash workflow config example"
@@ -147,7 +149,7 @@ Save your custom workflow configurations in the `addon/workflow_configs` directo
 The user_inputs key in the config allows you to customize variables that are specified by the user at time before runtime, for example if we add some alterations to the first workflow config by adding some variables to speicify the output anki deckname and also the topic of the notes to give the AI model some context which we can put in the prompt:
 
 ```yaml
-workflow_name: "barebone notes2flash workflow config example"
+workflow_name: "barebone notes2flash workflow config example w/ more inputs"
 
 user_inputs: [notes_url, notes_topic, deckname]
 
@@ -273,7 +275,7 @@ Only the final step needs to output the 'flashcards_data'-like format ie a list 
 
 ## Tips for Creating Effective Workflows
 
-- Ensure your prompts are explicit and clearly define the expected output format.
+- Ensure your prompts are explicit and clearly define the expected output format (chatGPT is great at writing prompts).
 - Test your workflows with various types of notes to ensure they work as expected.
 - Use descriptive names for your workflow files to easily identify their purpose.
 
@@ -290,13 +292,14 @@ For more detailed information on creating and customizing workflows, troubleshoo
 
 ## Contributions
 
-We welcome contributions, whether it's code or useful workflows that you think others would benefit from. 
+We welcome contributions, whether it's reporting bugs on GitHub, adding code or useful workflows that you think others would benefit from !!!
 
 ### Future Features
 
 - Add GitHub Actions for automated workflows.
 - Implement an API to allow restricted but free access to some models, so users don't have to create their own OpenRouter account and pay a minimum of $5.
 - Improve folder structure for workflow configurations by adding subfolders.
+- Better docs
 
 ### Explanation of Files and Workflow
 
