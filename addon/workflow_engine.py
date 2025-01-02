@@ -56,12 +56,18 @@ class WorkflowEngine:
         if not isinstance(config['add_cards_to_anki'], dict):
             raise ValueError("'add_cards_to_anki' must be a dictionary")
 
-    def replace_placeholders(self, config, data):
+    def replace_placeholders(self, config, data, stage_name=None):
         """Replace placeholders in the config with values from the user inputs."""
         if isinstance(config, dict):
-            return {k: self.replace_placeholders(v, data) for k, v in config.items()}
+            # For process_notes_to_cards stage, skip replacing placeholders in prompts
+            if stage_name == "process_notes_to_cards" and "prompt" in config:
+                return {k: (v if k == "prompt" else self.replace_placeholders(v, data, stage_name)) for k, v in config.items()}
+            return {k: self.replace_placeholders(v, data, stage_name) for k, v in config.items()}
         elif isinstance(config, list):
-            return [self.replace_placeholders(item, data) for item in config]
+            # For process_notes_to_cards stage, handle each step's config
+            if stage_name == "process_notes_to_cards":
+                return [self.replace_placeholders(item, data, stage_name) for item in config]
+            return [self.replace_placeholders(item, data, stage_name) for item in config]
         elif isinstance(config, str) and '{' in config and '}' in config:
             try:
                 return config.format(**data)
@@ -78,7 +84,7 @@ class WorkflowEngine:
 
         try:
             # Replace placeholders in the stage config using user_inputs and previous stage data
-            stage_config = self.replace_placeholders(stage_config, self.stage_data)
+            stage_config = self.replace_placeholders(stage_config, self.stage_data, stage_name)
             logger.debug(f"Stage config for {stage_name}: {stage_config}")
 
             if stage_name == "scrape_notes":
