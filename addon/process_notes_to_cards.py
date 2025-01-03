@@ -1,5 +1,6 @@
 """Main module for processing notes into flashcards."""
 import logging
+import json
 from typing import List, Dict, Any
 from .processing_utils import (
     split_content_into_chunks,
@@ -52,15 +53,26 @@ def process_chunk_through_steps(chunk: str, stage_config: List[Dict[str, Any]], 
             # Process the chunk
             result = call_openrouter_api(validated_config['prompt'], validated_config['model'], step_input)
             
-            if not result or not isinstance(result, list):
-                logger.error("Failed to parse API response")
-                return {}
-                
-            # Validate output structure
-            validate_output(result, validated_config['output_fields'])
+            # For intermediate steps, we just need the raw output as a string
+            is_final_step = step_index == len(stage_config) - 1
             
-            # Update state for next step
-            step_result = {validated_config['output_name']: result}
+            if is_final_step:
+                # Only validate structure for the final step
+                if not result or not isinstance(result, list):
+                    logger.error("Failed to parse JSON from final step response")
+                    return {}
+                    
+                # Validate output fields only for final step
+                if validated_config['output_fields']:
+                    validate_output(result, validated_config['output_fields'])
+                    
+                # Update state with parsed JSON result
+                step_result = {validated_config['output_name']: result}
+            else:
+                # For intermediate steps, store the raw JSON string
+                step_result = {validated_config['output_name']: json.dumps(result) if result else ""}
+            
+            # Update states
             chunk_state.update(step_result)
             chunk_output.update(step_result)
             
@@ -103,8 +115,15 @@ def process_notes_to_cards(stage_data: Dict[str, Any], stage_config: List[Dict[s
             # Merge chunk results with all results
             for key, value in chunk_results.items():
                 if key not in all_results:
-                    all_results[key] = []
-                all_results[key].extend(value)
+                    # Initialize based on whether this is a list (final step) or string (intermediate step)
+                    all_results[key] = [] if isinstance(value, list) else ""
+                
+                if isinstance(value, list):
+                    # For final step results (lists), extend the list
+                    all_results[key].extend(value)
+                else:
+                    # For intermediate step results (strings), concatenate
+                    all_results[key] += value
                 
         except Exception as e:
             logger.error(f"Error processing chunk {i}: {str(e)}")
