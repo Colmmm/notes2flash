@@ -261,7 +261,7 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> 
         response_content = result['choices'][0]['message']['content'].strip()
         # Log the API response in a more readable way
         logger.info("\nAPI Response:\n" + "-"*80 + "\n" + response_content + "\n" + "-"*80)
-        return extract_json_from_response(response_content)
+        return response_content
     except (KeyError, IndexError) as e:
         logger.error(f"Error parsing API response: {str(e)}")
         raise ValueError(f"Unexpected API response format: {str(e)}")

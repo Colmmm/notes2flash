@@ -57,6 +57,8 @@ def process_chunk_through_steps(chunk: str, stage_config: List[Dict[str, Any]], 
             is_final_step = step_index == len(stage_config) - 1
             
             if is_final_step:
+                # Extract json from api output if its final step
+                result = extract_json_from_response(result)
                 # Only validate structure for the final step
                 if not result or not isinstance(result, list):
                     logger.error("Failed to parse JSON from final step response")
