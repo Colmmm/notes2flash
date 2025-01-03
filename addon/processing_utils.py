@@ -208,19 +208,37 @@ def get_content_key_from_previous_step(current_step_index: int, stage_config: Li
     return content_key, 'process_step'
 
 def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Send a request to the OpenRouter API for processing notes."""
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    """
+    Send a request to the OpenRouter API for processing notes with retry logic.
     
+    Args:
+        prompt (str): The prompt template to use
+        model (str): The model to use
+        input_data (Dict[str, Any]): The input data for formatting the prompt
+        
+    Returns:
+        List[Dict[str, Any]]: The processed response content
+        
+    Raises:
+        ValueError: If there's an error formatting the prompt or processing the response
+        RuntimeError: If all retry attempts fail
+    """
+    import time
+    
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    # Get API key (this is required before retries since we don't want to retry auth errors)
     try:
         api_key = get_api_key_from_config()
     except Exception as e:
         logger.error(f"Failed to get API key: {str(e)}")
         raise
 
-    # Format the prompt with input data using our safe formatter
+    # Format prompt (this is required before retries since we don't want to retry formatting errors)
     try:
         formatted_prompt = format_prompt_safely(prompt, input_data)
-        # Log the formatted prompt in a more readable way
         logger.info("\nFormatted prompt being sent to API:\n" + "-"*80 + "\n" + formatted_prompt + "\n" + "-"*80)
     except Exception as e:
         logger.error(f"Error formatting prompt: {str(e)}")
@@ -237,31 +255,54 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> 
         "repetition_penalty": 1,
         "top_k": 0,
     }
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://github.com/Colmmm/notes2flash",
+        "X-Title": "Notes2Flash",
+        "Content-Type": "application/json"
+    }
 
-    # Send the request to the API
-    try:
-        response = requests.post(
-            url=url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": "https://github.com/Colmmm/notes2flash",
-                "X-Title": "Notes2Flash",
-                "Content-Type": "application/json"
-            },
-            data=json.dumps(data)
-        )
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error in API request: {str(e)}")
-        raise
-
-    # Handle the response and return the content
-    try:
-        result = response.json()
-        response_content = result['choices'][0]['message']['content'].strip()
-        # Log the API response in a more readable way
-        logger.info("\nAPI Response:\n" + "-"*80 + "\n" + response_content + "\n" + "-"*80)
-        return response_content
-    except (KeyError, IndexError) as e:
-        logger.error(f"Error parsing API response: {str(e)}")
-        raise ValueError(f"Unexpected API response format: {str(e)}")
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            # Send the request to the API
+            response = requests.post(
+                url=url,
+                headers=headers,
+                data=json.dumps(data)
+            )
+            response.raise_for_status()
+            
+            # Parse the response
+            result = response.json()
+            
+            # Check if the response has the expected structure
+            if 'choices' not in result or not result['choices']:
+                raise KeyError("Response missing 'choices' key or empty choices")
+                
+            if 'message' not in result['choices'][0]:
+                raise KeyError("Response missing 'message' key in first choice")
+                
+            if 'content' not in result['choices'][0]['message']:
+                raise KeyError("Response missing 'content' key in message")
+            
+            # Extract and log the response content
+            response_content = result['choices'][0]['message']['content'].strip()
+            logger.info("\nAPI Response:\n" + "-"*80 + "\n" + response_content + "\n" + "-"*80)
+            
+            return response_content
+            
+        except (requests.exceptions.RequestException, KeyError, ValueError, json.JSONDecodeError) as e:
+            last_error = str(e)
+            logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {last_error}")
+            
+            # If this wasn't our last attempt, wait before retrying
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            
+            # If this was our last attempt, raise a comprehensive error
+            error_msg = f"All {max_retries} attempts failed. Last error: {last_error}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
