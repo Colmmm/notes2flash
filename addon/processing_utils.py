@@ -324,6 +324,18 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
                 continue
             
             # If this was our last attempt, raise a comprehensive error
-            error_msg = f"All {max_retries} attempts failed. Last error: {last_error}"
+            error_msg = (
+                f"All {max_retries} attempts failed. Last error: {last_error}\n\n"
+                "🚨 Troubleshooting Tips:\n"
+                "1. Try using a different model with a larger context window. Some models may not handle large inputs or complex prompts effectively.\n"
+                "2. Verify that the API output is correctly formatted as a list of dictionaries. Parsing errors often occur if the response structure is not as expected.\n"
+                "   - Ensure the response follows this structure:\n"
+                "     [\n"
+                "       {\"key1\": \"value1\", \"key2\": \"value2\"},\n"
+                "       {\"key1\": \"value3\", \"key2\": \"value4\"}\n"
+                "     ]\n"
+                "3. Reduce the chunk size to avoid exceeding the model's context window.\n"
+                "4. Check if the API is returning a cached response. You can avoid caching by adding unique identifiers (e.g., timestamps or random tokens) to your input.\n"
+            )
             logger.error(error_msg)
             raise RuntimeError(error_msg)
