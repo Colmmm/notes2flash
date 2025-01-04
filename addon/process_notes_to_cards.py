@@ -50,29 +50,23 @@ def process_chunk_through_steps(chunk: str, stage_config: List[Dict[str, Any]], 
                 chunk if step_index == 0 else chunk_state[content_key]
             )
             
-            # Process the chunk
-            result = call_openrouter_api(validated_config['prompt'], validated_config['model'], step_input)
-            
-            # For intermediate steps, we just need the raw output as a string
+            # Determine if this is the final step as that will determine whether should extract json from api output
             is_final_step = step_index == len(stage_config) - 1
             
-            if is_final_step:
-                # Extract json from api output if its final step
-                result = extract_json_from_response(result)
-                # Only validate structure for the final step
-                if not result or not isinstance(result, list):
-                    logger.error("Failed to parse JSON from final step response")
-                    return {}
-                    
-                # Validate output fields only for final step
-                if validated_config['output_fields']:
-                    validate_output(result, validated_config['output_fields'])
-                    
-                # Update state with parsed JSON result
-                step_result = {validated_config['output_name']: result}
-            else:
-                # For intermediate steps, store the raw JSON string
-                step_result = {validated_config['output_name']: json.dumps(result) if result else ""}
+            # Process the chunk with step information
+            result = call_openrouter_api(
+                validated_config['prompt'],
+                validated_config['model'],
+                step_input,
+                is_final_step,
+                validated_config['output_fields'] if is_final_step else None
+            )
+            
+            # For final step, result is already parsed JSON list
+            # For intermediate steps, result is raw string
+            step_result = {
+                validated_config['output_name']: result if is_final_step else json.dumps(result) if result else ""
+            }
             
             # Update states
             chunk_state.update(step_result)

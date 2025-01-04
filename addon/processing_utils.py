@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import requests
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Union
 from .scrape_utils import load_config
 
 logger = logging.getLogger("notes2flash")
@@ -207,7 +207,7 @@ def get_content_key_from_previous_step(current_step_index: int, stage_config: Li
     
     return content_key, 'process_step'
 
-def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_final_step: bool, output_fields: List[str] = None) -> Union[str, List[Dict[str, Any]]]:
     """
     Send a request to the OpenRouter API for processing notes with retry logic.
     
@@ -215,9 +215,12 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> 
         prompt (str): The prompt template to use
         model (str): The model to use
         input_data (Dict[str, Any]): The input data for formatting the prompt
+        is_final_step (bool): Whether this is the final step in the workflow
+        output_fields (List[str], optional): Expected fields in the output JSON for final step
         
     Returns:
-        List[Dict[str, Any]]: The processed response content
+        Union[str, List[Dict[str, Any]]]: For intermediate steps, returns the raw response content.
+                                         For the final step, returns the parsed JSON list.
         
     Raises:
         ValueError: If there's an error formatting the prompt or processing the response
@@ -227,7 +230,7 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> 
     
     url = "https://openrouter.ai/api/v1/chat/completions"
     max_retries = 5
-    retry_delay = 0  # this will increase by 5 seconds for each failed attempt
+    retry_delay = 5  # initial retry delay is 5 seconds and then 10 seconds after first retry
     
     # Get API key (this is required before retries since we don't want to retry auth errors)
     try:
@@ -291,7 +294,22 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> 
             response_content = result['choices'][0]['message']['content'].strip()
             logger.info("\nAPI Response:\n" + "-"*80 + "\n" + response_content + "\n" + "-"*80)
             
-            return response_content
+            if is_final_step:
+                # Extract JSON from response for final step
+                parsed_result = extract_json_from_response(response_content)
+                
+                # Validate the parsed result
+                if not parsed_result or not isinstance(parsed_result, list):
+                    raise ValueError("Failed to parse JSON from final step response")
+                
+                # Validate output fields if specified
+                if output_fields:
+                    validate_output(parsed_result, output_fields)
+                
+                return parsed_result
+            else:
+                # Return raw content for intermediate steps
+                return response_content
             
         except (requests.exceptions.RequestException, KeyError, ValueError, json.JSONDecodeError) as e:
             last_error = str(e)
@@ -299,10 +317,10 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any]) -> 
             
             # If this wasn't our last attempt, wait before retrying
             if attempt < max_retries - 1:
-                retry_delay+=5 # wait an additional 5 seconds for each failed attempt
                 logger.info(f"For attempt {attempt + 1}/{max_retries} waiting {retry_delay} seconds...")
                 time.sleep(retry_delay)
                 logger.info((f"Wait for attempt {attempt + 1}/{max_retries} is over. Proceeding again."))
+                retry_delay=10 # increase wait to 10 seconds for subsequent retries
                 continue
             
             # If this was our last attempt, raise a comprehensive error
