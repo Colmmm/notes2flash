@@ -4,22 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-
 ## [1.1.0] - 2025-01-05
+
 ### 🆕 Added
-- Added robust retry logic for api calls for unexpected responses
-- On last retry, parser will also try to process truncated content
-- Added cancel button to interupt workflow on gui
-- Anti-cache features to stop api from giving same response (caused issues if it gives bad response, it would then keep giving this bad response on retries making retries not useful)
+- Implemented robust retry logic for API calls to handle unexpected responses.
+- Introduced fallback handling for truncated content on the final retry attempt.
+- Added a **Cancel** button to the GUI to interrupt ongoing workflows.
+- Included anti-caching mechanisms to prevent the API from returning the same incorrect response across retries, making retries more effective.
 
 ### ⚠️ Changed
-- Processing workflow now takes a chunk of the scraped content and processes it through all chunks before moving onto next chunk, rather than trying to process all chunks at once then moving to next step (if theres more than one step). 
+- **Multi-step processing workflows**: The workflow now processes each chunk through all steps before moving to the next chunk, improving efficiency in multi-step workflows.
+- The chunk size parameter is now required only in the first processing step.
+- The format reminder is appended only during the final processing step.
 
 ### 🐛 Fixed
-- Fixed chunking which was initially broken because the way the prompt being passed to processing stage had already had the full scraped content subbed in and so the chunked content had no where to go and so was just using full scraped content for each chunks prompt and api call
+- Resolved an issue with chunking where the entire scraped content was being used for each API call, instead of the intended chunked content, due to incorrect prompt handling.
 
 ---
 
 ## [1.0.0] - 2024-11-18
+
 ### 🆕 Added
 - Initial release.
