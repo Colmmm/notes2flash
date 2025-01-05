@@ -1,0 +1,71 @@
+workflow_name: "Vocabulary Extraction and Multi-step Processing"
+
+user_inputs: [notes_url, deckname]
+
+# 1) Scrape Notes from Online Docs
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output  # The raw notes from the provided URL
+
+# 2) Process Notes to Extract Vocabulary and Generate Flashcards
+process_notes_to_cards:
+  - step: "Extract vocabulary and phrases"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
+    chunk_size: 500
+    input:
+      - scraped_notes_output
+    output: extracted_vocabulary  # Consistent naming for intermediate vocabulary output
+    prompt: |
+      Extract vocabulary and phrases from the following document. The document contains Mandarin keywords or short phrases. For each item, provide:
+      - The Mandarin word or phrase.
+      - Its pinyin representation.
+      - Its English translation.
+
+      Ignore irrelevant content and remove duplicates. If there are multiple valid translations, select the most commonly used one. Ensure the output strictly follows this JSON format:
+      [
+        {"mandarin": "word1", "pinyin": "pinyin1", "translation": "translation1"},
+        {"mandarin": "word2", "pinyin": "pinyin2", "translation": "translation2"},
+        ...
+      ]
+
+      Document:
+      {scraped_notes_output}
+    
+  - step: "Generate example sentences and flashcards"
+    model: "meta-llama/llama-3.1-70b-instruct:free"
+    input:
+      - extracted_vocabulary
+    attach_format_reminder: false
+    output: flashcards
+    output_fields:
+      - sentence
+      - translation
+      - keywords
+    prompt: |
+      Use the vocabulary below to generate example sentences in Mandarin. Each sentence should:
+      - Naturally incorporate one or more keywords.
+      - Include additional context or keywords if necessary for clarity (only if not commonly known by an upper-intermediate learner).
+
+      For each sentence, provide:
+      - The Mandarin sentence.
+      - Its English translation.
+      - A list of keywords in the format "keyword pinyin translation" separated by `<br>` for multiple keywords.
+
+      Ensure the output strictly follows this JSON format:
+      [
+        {"sentence": "Example sentence in Mandarin.", "translation": "English translation of the sentence.", "keywords": "keyword1 pinyin1 translation1<br>keyword2 pinyin2 translation2"},
+        {"sentence": "Another example sentence in Mandarin.", "translation": "English translation of this sentence.", "keywords": "keywordA pinyinA translationA<br>keywordB pinyinB translationB"},
+        ...
+      ]
+
+      Keywords:
+      {extracted_vocabulary}
+
+# 3) Add Cards to Anki
+add_cards_to_anki:
+  flashcards_data: flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Notes2Flash Basic Note Type"
+    front: "{sentence}"
+    back: "{translation}<br><br>{keywords}"
