@@ -79,10 +79,11 @@ class CustomInputDialog(QDialog):
         self.long_process_label.hide()
         self.layout.addWidget(self.long_process_label)
 
-        # Button to confirm
+        # Submit/Cancel button
         self.submit_button = QPushButton("Submit")
         self.layout.addWidget(self.submit_button)
-        self.submit_button.clicked.connect(self.submit_data)
+        self.submit_button.clicked.connect(self.handle_button_click)
+        self.is_processing = False
 
         # Set layout to dialog
         self.setLayout(self.layout)
@@ -126,7 +127,7 @@ class CustomInputDialog(QDialog):
     def update_dots(self):
         self.dots_count = (self.dots_count + 1) % 4
         dots = "." * self.dots_count
-        self.submit_button.setText(f"Processing{dots}")
+        self.submit_button.setText(f"Processing{dots}" "\n(Press to cancel)")
 
     def on_workflow_changed(self, index):
         # Clear existing input fields and labels
@@ -177,8 +178,8 @@ class CustomInputDialog(QDialog):
         # Save user inputs
         self.save_user_inputs(workflow_config, user_inputs)
 
-        # Start processing animation
-        self.submit_button.setEnabled(False)
+        # Update UI for processing
+        self.is_processing = True
         self.dots_timer.start()
         
         # Hide the long process label (in case it was shown from a previous run)
@@ -206,7 +207,7 @@ class CustomInputDialog(QDialog):
         self.long_process_timer.stop()
         
         # Reset UI
-        self.submit_button.setEnabled(True)
+        self.is_processing = False
         self.submit_button.setText("Submit")
         self.long_process_label.hide()
         self.update_progress("Complete")
@@ -222,7 +223,7 @@ class CustomInputDialog(QDialog):
         self.long_process_timer.stop()
         
         # Reset UI
-        self.submit_button.setEnabled(True)
+        self.is_processing = False
         self.submit_button.setText("Submit")
         self.long_process_label.hide()
         
@@ -255,6 +256,24 @@ class CustomInputDialog(QDialog):
                 return json.load(f)
         except FileNotFoundError:
             return {}
+
+    def handle_button_click(self):
+        if self.is_processing:
+            if self.worker and self.worker.isRunning():
+                self.worker.terminate()
+                self.worker.wait()
+                
+                # Reset UI
+                self.is_processing = False
+                self.submit_button.setText("Submit")
+                self.long_process_label.hide()
+                self.dots_timer.stop()
+                self.long_process_timer.stop()
+                
+                self.update_progress("Cancelled")
+                QMessageBox.information(self, "Cancelled", "Processing was cancelled.")
+        else:
+            self.submit_data()
 
     def save_user_inputs(self, workflow, inputs):
         user_inputs = self.load_user_inputs()
