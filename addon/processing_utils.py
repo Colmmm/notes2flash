@@ -230,7 +230,7 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
     
     url = "https://openrouter.ai/api/v1/chat/completions"
     max_retries = 5
-    retry_delay = 5  # initial retry delay is 5 seconds and then 10 seconds after first retry
+    retry_delay = 10  # initial retry delay is 10 seconds and then additional 2 seconds for each failed attempt
     
     # Get API key (this is required before retries since we don't want to retry auth errors)
     try:
@@ -247,27 +247,31 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
         logger.error(f"Error formatting prompt: {str(e)}")
         raise ValueError(f"Error formatting prompt: {str(e)}")
 
-    # Define the data payload for the API request
-    data = {
-        "model": model,
-        "messages": [{"role": "user", "content": formatted_prompt}],
-        "top_p": 1,
-        "temperature": 0.8,
-        "frequency_penalty": 0,
-        "presence_penalty": 0,
-        "repetition_penalty": 1,
-        "top_k": 0,
-    }
-    
     headers = {
         "Authorization": f"Bearer {api_key}",
         "HTTP-Referer": "https://github.com/Colmmm/notes2flash",
         "X-Title": "Notes2Flash",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
     }
 
     last_error = None
     for attempt in range(max_retries):
+        # Define the data payload for the API request with a unique identifier for this attempt
+        data = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": f"Request ID: {time.time()}-{attempt}"},  # Add unique identifier
+                {"role": "user", "content": formatted_prompt}
+            ],
+            "top_p": 1,
+            "temperature": 0.8,
+            "frequency_penalty": 0,
+            "presence_penalty": 0,
+            "repetition_penalty": 1,
+            "top_k": 0,
+        }
         try:
             # Send the request to the API
             response = requests.post(
@@ -320,7 +324,7 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
                 logger.info(f"For attempt {attempt + 1}/{max_retries} waiting {retry_delay} seconds...")
                 time.sleep(retry_delay)
                 logger.info((f"Wait for attempt {attempt + 1}/{max_retries} is over. Proceeding again."))
-                retry_delay=10 # increase wait to 10 seconds for subsequent retries
+                retry_delay+=2 # increase wait by 2 seconds
                 continue
             
             # If this was our last attempt, raise a comprehensive error
