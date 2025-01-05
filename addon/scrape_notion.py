@@ -1,4 +1,4 @@
-import logging
+from .logger import get_logger
 from .scrape_utils import (
     load_config,
     extract_text_from_doc,

@@ -1,6 +1,6 @@
 """Main module for processing notes into flashcards."""
-import logging
 import json
+from .logger import get_logger
 from typing import List, Dict, Any
 from .processing_utils import (
     split_content_into_chunks,
@@ -14,7 +14,7 @@ from .processing_utils import (
     call_openrouter_api
 )
 
-logger = logging.getLogger("notes2flash")
+logger = get_logger()
 
 def process_chunk_through_steps(chunk: str, stage_config: List[Dict[str, Any]], stage_data: Dict[str, Any], 
                               workflow_config: Dict[str, Any]) -> Dict[str, Any]:

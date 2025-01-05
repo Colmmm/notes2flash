@@ -1,5 +1,4 @@
 import os, sys
-import logging
 # Add the path to the `libs` directory where extra packages are bundled
 addon_folder = os.path.dirname(__file__)
 libs_path = os.path.join(addon_folder, "libs")
@@ -11,9 +10,10 @@ from .scrape_notes import scrape_notes, mark_document_as_processed, get_document
 from .process_notes_to_cards import process_notes_to_cards
 from .add_cards_to_anki import add_cards_to_anki
 from .scrape_utils import parse_url
+from .logger import get_logger, reinitialize_logger
 
-# Get logger from the same namespace as notes2flash
-logger = logging.getLogger("notes2flash")
+# Get logger instance
+logger = get_logger()
 
 class WorkflowEngine:
     def __init__(self, workflow_config, user_inputs, debug=False):
@@ -22,9 +22,9 @@ class WorkflowEngine:
         self.stage_data = {}
         self.debug = debug
         if self.debug:
-            logger.setLevel(logging.DEBUG)
+            logger = reinitialize_logger(debug=True)
         else:
-            logger.setLevel(logging.INFO)
+            logger = reinitialize_logger(debug=False)
 
     @staticmethod
     def load_workflow_config(config_path):

@@ -1,4 +1,4 @@
-import logging
+from .logger import get_logger
 from .scrape_utils import (
     parse_url,
     get_document_state,

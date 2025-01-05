@@ -1,11 +1,11 @@
 import json
-import logging
 import os
 import yaml
 from aqt import mw
 from anki.notes import Note
+from .logger import get_logger
 
-logger = logging.getLogger("notes2flash")
+logger = get_logger()
 
 def load_note_type_template(note_type_name):
     """Load a note type template from the included_note_types directory."""

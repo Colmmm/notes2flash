@@ -1,11 +1,11 @@
 import os
 import sys
-import logging
 import json
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import difflib
 from aqt import mw
+from .logger import get_logger
 
 # Add the path to the `libs` directory where extra packages are bundled
 addon_folder = os.path.dirname(__file__)
@@ -13,8 +13,8 @@ libs_path = os.path.join(addon_folder, "libs")
 if libs_path not in sys.path:
     sys.path.insert(0, libs_path)
 
-# Set up logging
-logger = logging.getLogger("notes2flash")
+# Get logger instance
+logger = get_logger()
 
 # Path to config and tracked docs files
 current_dir = os.path.dirname(__file__)

@@ -1,12 +1,12 @@
 """Utility functions for processing notes into flashcards."""
 import json
-import logging
 import re
 import requests
 from typing import List, Dict, Any, Tuple, Union
 from .scrape_utils import load_config
+from .logger import get_logger
 
-logger = logging.getLogger("notes2flash")
+logger = get_logger()
 
 def extract_json_from_response(response_content: str, allow_partial: bool = False) -> List[Dict[str, Any]]:
     """

@@ -9,7 +9,9 @@ from aqt.deckbrowser import DeckBrowser
 import os
 import yaml
 import json
-import logging
+from .logger import get_logger
+
+logger = get_logger()
 
 class Notes2FlashWorker(QThread):
     finished = pyqtSignal(dict)

@@ -1,9 +1,10 @@
 import requests
 import json
-import logging
 from typing import Optional, Dict, Any
 from urllib.parse import urlparse
-from .scrape_utils import logger
+from .logger import get_logger
+
+logger = get_logger()
 
 def fetch_obsius_content(url: str) -> Optional[Dict[str, Any]]:
     """
