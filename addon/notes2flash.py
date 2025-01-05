@@ -3,17 +3,17 @@ import os
 from .workflow_engine import WorkflowEngine
 
 # Set up custom logger
-def setup_logger():
+def setup_logger(debug=False):
     addon_folder = os.path.dirname(__file__)
     log_file = os.path.join(addon_folder, "notes2flash.log")
     
     # Create logger
     logger = logging.getLogger("notes2flash")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
     
     # Create file handler
     file_handler = logging.FileHandler(log_file, mode='w')
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG if debug else logging.INFO)
     
     # Create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -25,7 +25,7 @@ def setup_logger():
     
     return logger
 
-# Initialize logger
+# Initialize logger with default settings
 logger = setup_logger()
 
 def notes2flash(workflow_config_path, user_inputs, progress_callback=None, debug=False):
@@ -45,9 +45,10 @@ def notes2flash(workflow_config_path, user_inputs, progress_callback=None, debug
         ValueError: If the input parameters are invalid.
         RuntimeError: If there's an error during workflow execution.
     """
-    if debug:
-        logger.setLevel(logging.DEBUG)
-        logger.debug("Debug mode enabled")
+    # Reinitialize logger with debug settings if debug mode is enabled
+    global logger
+    logger = setup_logger(debug=debug)
+    logger.debug("Debug mode enabled")
 
     logger.info("Starting notes2flash execution")
 

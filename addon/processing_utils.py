@@ -8,18 +8,40 @@ from .scrape_utils import load_config
 
 logger = logging.getLogger("notes2flash")
 
-def extract_json_from_response(response_content: str) -> List[Dict[str, Any]]:
-    """Extract and parse JSON data from API response content."""
-    json_match = re.search(r'\[.*\]', response_content, re.DOTALL)
-    if not json_match:
-        logger.error("No JSON data found in the text")
-        return []
-        
-    try:
-        return json.loads(json_match.group())
-    except json.JSONDecodeError:
-        logger.error("Failed to parse extracted JSON")
-        return []
+def extract_json_from_response(response_content: str, allow_partial: bool = False) -> List[Dict[str, Any]]:
+    """
+    Extract and parse JSON data from API response content.
+    
+    Args:
+        response_content: The response content to parse
+        allow_partial: If True, attempt to parse partial/incomplete responses by extracting complete objects
+    """
+    # First try to find a complete JSON array
+    json_match = re.search(r'\[\s*{[^]]*}\s*\]', response_content, re.DOTALL)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            logger.error("Failed to parse extracted JSON")
+            if not allow_partial:
+                return []
+    
+    # Only attempt partial parsing if explicitly allowed
+    if allow_partial:
+        # Try to find as many complete objects as possible
+        objects = re.findall(r'{[^{}]*}(?=\s*,|\s*\])', response_content)
+        if objects:
+            try:
+                # Reconstruct a valid JSON array from the complete objects
+                reconstructed_json = f"[{','.join(objects)}]"
+                logger.warning("Response appears to be truncated, attempting to parse complete objects")
+                return json.loads(reconstructed_json)
+            except json.JSONDecodeError:
+                logger.error("Failed to parse reconstructed JSON from partial response")
+                return []
+    
+    logger.error("No valid JSON data found in the text")
+    return []
 
 def get_api_key_from_config() -> str:
     """Read the OpenRouter API key from the addon's config."""
@@ -227,6 +249,8 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
         RuntimeError: If all retry attempts fail
     """
     import time
+    import uuid
+    from datetime import datetime
     
     url = "https://openrouter.ai/api/v1/chat/completions"
     max_retries = 5
@@ -241,8 +265,7 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
 
     # Format prompt (this is required before retries since we don't want to retry formatting errors)
     try:
-        formatted_prompt = format_prompt_safely(prompt, input_data)
-        logger.info("\nFormatted prompt being sent to API:\n" + "-"*80 + "\n" + formatted_prompt + "\n" + "-"*80)
+        base_prompt = format_prompt_safely(prompt, input_data)
     except Exception as e:
         logger.error(f"Error formatting prompt: {str(e)}")
         raise ValueError(f"Error formatting prompt: {str(e)}")
@@ -258,13 +281,25 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
 
     last_error = None
     for attempt in range(max_retries):
+        # Add a unique suffix to the prompt for each retry attempt
+        retry_suffix = "" if attempt == 0 else (
+            f"\n\nRetry attempt {attempt} at {datetime.utcnow().isoformat()} "
+            f"with nonce {uuid.uuid4()} "
+            f"(Previous error: {last_error})"
+        )
+        formatted_prompt = base_prompt + retry_suffix
+        
+        logger.info("\nFormatted prompt being sent to API:\n" + "-"*80 + "\n" + formatted_prompt + "\n" + "-"*80)
+        
         # Define the data payload for the API request with a unique identifier for this attempt
         data = {
             "model": model,
             "messages": [
-                {"role": "system", "content": f"Request ID: {time.time()}-{attempt}"},  # Add unique identifier
+                {"role": "system", "content": f"Request ID: {datetime.utcnow().isoformat()}-{uuid.uuid4()}-attempt{attempt}"},  # Add unique identifier
                 {"role": "user", "content": formatted_prompt}
             ],
+            "unique_token": str(uuid.uuid4()),  # Random token to prevent caching
+            "timestamp": datetime.utcnow().isoformat(),  # Add a timestamp
             "top_p": 1,
             "temperature": 0.8,
             "frequency_penalty": 0,
@@ -300,7 +335,9 @@ def call_openrouter_api(prompt: str, model: str, input_data: Dict[str, Any], is_
             
             if is_final_step:
                 # Extract JSON from response for final step
-                parsed_result = extract_json_from_response(response_content)
+                # Only allow partial parsing on the final retry attempt
+                allow_partial = (attempt == max_retries - 1)
+                parsed_result = extract_json_from_response(response_content, allow_partial)
                 
                 # Validate the parsed result
                 if not parsed_result or not isinstance(parsed_result, list):
