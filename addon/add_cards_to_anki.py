@@ -109,13 +109,25 @@ def add_note_to_deck(deck_name, note_type_name, fields):
     # Set the deck ID for the note
     note.note_type()['did'] = deck_id
 
-    # Add the note to the collection
+    # Check if a note with the same fields already exists in this deck
+    search_query = [f'deck:"{deck_name}"']  # Limit search to specific deck
+    for i, (field_name, field_value) in enumerate(fields.items()):
+        if field_value.strip():  # Only include non-empty fields in the search
+            search_query.append(f'"{field_name}:{field_value}"')
+    
+    if search_query:
+        existing_notes = mw.col.find_notes(" AND ".join(search_query))
+        if existing_notes:
+            logger.warning(f"Note already exists in deck '{deck_name}' with fields: {fields}")
+            return "duplicate"
+
+    # Add the note to the collection if it doesn't exist
     if mw.col.addNote(note):
         logger.info(f"Note added to deck '{deck_name}': Fields - {fields}")
-        return True
+        return "success"
     else:
         logger.error(f"Failed to add note to deck '{deck_name}'.")
-        return False
+        return "error"
 
 def add_cards_to_anki(stage_data, stage_config):
     """Process the stage data and add cards to Anki based on the configuration."""
@@ -153,6 +165,7 @@ def add_cards_to_anki(stage_data, stage_config):
     errors = []
 
     # Process each flashcard and add it to the deck
+    duplicates = []
     for card_data in flashcards:
         fields = {}
         try:
@@ -160,9 +173,12 @@ def add_cards_to_anki(stage_data, stage_config):
                 if field != 'template_name':
                     fields[field] = template.format(**card_data)
             
-            if add_note_to_deck(deck_name, template_name, fields):
+            result = add_note_to_deck(deck_name, template_name, fields)
+            if result == "success":
                 cards_added += 1
-            else:
+            elif result == "duplicate":
+                duplicates.append(card_data)
+            else:  # result == "error"
                 errors.append(f"Failed to add card: {card_data}")
         except KeyError as e:
             logger.error(f"Missing key in card data: {e}")
@@ -172,10 +188,13 @@ def add_cards_to_anki(stage_data, stage_config):
             errors.append(f"Error adding card: {e}")
 
     logger.info(f"Finished adding cards to Anki. {cards_added} cards added.")
+    if duplicates:
+        logger.warning(f"Found {len(duplicates)} duplicate notes already in deck '{deck_name}'")
     if errors:
         logger.warning(f"Encountered {len(errors)} errors while adding cards.")
 
     return {
         "cards_added": cards_added,
+        "duplicates": len(duplicates),
         "errors": errors if errors else None
     }

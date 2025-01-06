@@ -110,11 +110,14 @@ class WorkflowEngine:
                 if not isinstance(stage_config, dict):
                     raise ValueError("Invalid stage_config for add_cards_to_anki. Expected a dictionary.")
                 result = add_cards_to_anki(self.stage_data, stage_config)
-                # Check if cards were actually added successfully
-                if result.get('cards_added', 0) == 0 or result.get('errors'):
-                    error_msg = f"Failed to add cards to Anki: {result.get('errors')}"
+                # Check for actual errors, but don't treat duplicates as errors
+                if result.get('errors'):
+                    error_msg = f"Failed to add some cards to Anki: {result.get('errors')}"
                     logger.error(error_msg)
                     raise ValueError(error_msg)
+                # Log duplicates as info, not as errors
+                if result.get('duplicates', 0) > 0:
+                    logger.info(f"Found {result['duplicates']} duplicate cards in deck")
             else:
                 raise ValueError(f"Unknown stage: {stage_name}")
 
@@ -169,12 +172,14 @@ class WorkflowEngine:
             doc_id = self.stage_data.get('doc_id')
             logger.debug(f"Document ID for marking as processed: {doc_id}")
             if doc_id:
-                # Only mark as processed if we actually added cards successfully
-                if self.stage_data.get('cards_added', 0) > 0:
+                # Consider the document processed if we either added cards or found duplicates
+                cards_added = self.stage_data.get('cards_added', 0)
+                duplicates = self.stage_data.get('duplicates', 0)
+                if cards_added > 0 or duplicates > 0:
                     mark_document_as_processed(doc_id)  # This will also clear pending changes
-                    logger.info(f"Marked document {doc_id} as successfully processed")
+                    logger.info(f"Marked document {doc_id} as successfully processed: {cards_added} cards added, {duplicates} duplicates found")
                 else:
-                    logger.warning(f"No cards were added for document {doc_id}, not marking as processed")
+                    logger.warning(f"No cards were added or found as duplicates for document {doc_id}, not marking as processed")
 
             logger.info("Workflow completed successfully")
             if progress_callback:
