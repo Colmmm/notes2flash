@@ -208,10 +208,9 @@ scrape_notes:
 process_notes_to_cards:
   - step: "Extract vocabulary and phrases"
     model: "meta-llama/llama-3.1-70b-instruct:free"
-    chunk_size: 4000
+    chunk_size: 400
     input:
       - scraped_notes_output
-    attach_format_reminder: true
     output: extracted_vocabulary  # Consistent naming for intermediate vocabulary output
     prompt: |
       Extract vocabulary and phrases from the following document. The document contains Mandarin keywords or short phrases. For each item, provide:
@@ -231,7 +230,6 @@ process_notes_to_cards:
     
   - step: "Generate example sentences and flashcards"
     model: "meta-llama/llama-3.1-70b-instruct:free"
-    chunk_size: 4000
     input:
       - extracted_vocabulary
     attach_format_reminder: false
@@ -277,13 +275,29 @@ Only the final step needs to output the 'flashcards_data'-like format ie a list 
 - Enable debug mode in the addon interface for detailed logging.
 - Check the `notes2flash.log` file in the addon directory for error messages and execution logs.
 - Use the logs to identify issues in your workflow configuration or API calls.
-- A common error is that the API is not formatting the output properly, it should be a list of dictionaries where each dictionary represents a flashcard with the fields specified in `output_fields`
+- A common error is that the API is not formatting the output properly; it should be a list of dictionaries where each dictionary represents a flashcard with the fields specified in `output_fields`.
+- Feel free to delete `notes2flash.log` to reset the logging, and `tracked_docs.json` to reset document tracking.
 
-## Tips for Creating Effective Workflows
+### 🚨 Troubleshooting Tips:
+1. Try using a different model. Some models may not handle large inputs or complex prompts effectively.
+2. Verify that the API output is correctly formatted as a list of dictionaries. Parsing errors often occur if the response structure is not as expected.
+   - Ensure the response follows this structure:
+     ```
+     [
+       {"key1": "value1", "key2": "value2"},
+       {"key1": "value3", "key2": "value4"}
+     ]
+     ```
+3. Reduce the chunk size to avoid exceeding the model's context window.
+4. Check if the API is returning a cached response. You can avoid caching by adding unique identifiers (e.g., timestamps or random tokens) to your input.
+5. Beware that free models typically have usage limits.
 
-- Ensure your prompts are explicit and clearly define the expected output format (chatGPT is great at writing prompts).
+## More tips for Creating Effective Workflows
+
+- Ensure your prompts are explicit and clearly define the expected output format. (ChatGPT is great at writing prompts and editing configs.)
 - Test your workflows with various types of notes to ensure they work as expected.
 - Use descriptive names for your workflow files to easily identify their purpose.
+
 
 ## Error Handling
 
@@ -319,8 +333,10 @@ This project consists of several key files and directories that work together to
   - **config.json**: Stores user configuration including API keys
   - **manifest.json**: Addon metadata and version information
   - **process_notes_to_cards.py**: Handles the conversion of notes to flashcard format
+  - **process_utils.py**: Helper functions for processing stage
   - **add_cards_to_anki.py**: Manages the integration with Anki's card creation system
   - **workflow_engine.py**: Orchestrates the execution of workflow configurations
+  - **logger.py**: Handles logger
 
 #### Note Source Handlers
 - **addon/scrape_googledoc.py**: Handles extraction from Google Docs
