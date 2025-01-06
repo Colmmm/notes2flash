@@ -16,9 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Multi-step processing workflows**: The workflow now processes each chunk through all steps before moving to the next chunk, improving efficiency in multi-step workflows.
 - The chunk size parameter is now required only in the first processing step.
 - The format reminder is appended only during the final processing step.
+- Moved logger into its own file.
 
 ### 🐛 Fixed
 - Resolved an issue with chunking where the entire scraped content was being used for each API call, instead of the intended chunked content, due to incorrect prompt handling.
+- Fixed debug mode for logger
 
 ---
 
