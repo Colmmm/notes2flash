@@ -1,0 +1,49 @@
+workflow_name: "English → Mandarin/Pinyin/Example (Traditional & Simplified)"
+
+user_inputs: [notes_url, deckname]
+
+# 1) **Scrape Notes from online docs (Google docs, Notion, Obsius)**
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output  # The output name for the scraped notes
+
+# 2) **Process Notes into Flashcards**
+process_notes_to_cards:
+  - step: "Organize notes and create flashcards"
+    model: "openrouter/free" # Choosing this model because its free, for more advanced processing you can look up on openrouter.com and choose a more powerful model, just make sure to update the model name here and ensure you have access to it with your API key.
+    chunk_size: 500  # Maximum chars per chunk
+    input:
+      - scraped_notes_output  # Input is the notes content from scrape_notes stage
+    attach_format_reminder: True
+    output: flashcards  # The output will always be a list of dictionaries with the following fields:
+    output_fields:
+      - english_prompt
+      - simplified
+      - traditional
+      - pinyin
+      - example_sentence_traditional
+      - example_sentence_simplified
+    prompt: |
+      Extract English vocabulary, keywords, and phrases from the content that would be useful for someone learning Mandarin. Carefully review the input, as it may contain unnecessary text or incomplete information that should be ignored. 
+      For each extracted item, generate flashcards using the following keys:
+
+      "english_prompt": The English word or phrase to be translated.
+      "simplified": The Mandarin translation in Simplified Chinese.
+      "traditional": The corresponding Traditional Chinese version.
+      "pinyin": The pinyin representation of the Mandarin translation.
+      "example_sentence_traditional": Generate a relevant example sentence using the Mandarin word in Traditional Chinese. Ensure the sentence is simple, avoids complex vocabulary unless necessary for context, and is appropriate for a Mandarin learner.
+      "example_sentence_simplified": Provide the same example sentence in Simplified Chinese.
+
+      Ensure the output is clear, concise, and strictly adheres to the JSON format, with no extra keys or deviations. Clean the input as necessary to ensure accuracy.
+
+      Input notes:
+      {scraped_notes_output}
+
+# 3) **Add Cards to Anki**
+add_cards_to_anki:
+  flashcards_data: flashcards  # Input is the list of flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Notes2Flash Basic Note Type"
+    front: "{english_prompt}"
+    back: "<b>{traditional}</b> ({simplified})<br>{pinyin}<br><br>{example_sentence_traditional}<br>{example_sentence_simplified}"

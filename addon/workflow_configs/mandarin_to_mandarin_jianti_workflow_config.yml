@@ -1,0 +1,64 @@
+workflow_name: "Mandarin → Mandarin/Pinyin/Translation/Example (Simplified Only)"
+
+user_inputs: [notes_url, deckname]
+
+# 1) Scrape Notes
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output
+
+# 2) Process Notes into Flashcards
+process_notes_to_cards:
+  - step: "Categorize and create multi-type cards"
+    model: "openrouter/free" # Choosing this model because its free, for more advanced processing you can look up on openrouter.com and choose a more powerful model, just make sure to update the model name here and ensure you have access to it with your API key.
+    chunk_size: 500
+    input:
+      - scraped_notes_output
+    attach_format_reminder: True
+    output: flashcards
+    output_fields:
+      - prompt      
+      - answer      
+      - pinyin      
+      - translation 
+      - example_sentence_simplified
+    prompt: |
+      你是一位资深的中文老师。你的任务是从提供的笔记中提取词汇、短语和完整的句子，并将其转化为「主动回忆」型闪卡。
+      请全程使用「简体中文」。
+
+      编写「prompt」的关键原则：
+      1. 简短有力：提示语应尽可能精炼（建议 15 字以内），避免冗长的解释。
+      2. 直接切入：直接描述场景、感觉或近义词。
+      3. 排除关键字：绝对不能在 prompt 中出现 answer 里的字。
+
+      类型示例：
+      - 基础词汇：描述用途或属性。例如「早晨提神喝的黑色苦味饮料」（目标：咖啡）。
+      - 语义辨析：标注语气差异。例如「『帮忙』的正式书面用语」（目标：支援）。
+      - 成语/短语：描述核心逻辑。例如「做事有头无尾，缺乏耐性」（目标：虎头蛇尾）。
+      - 完整句子：提炼核心情境。例如「如何形容水准不稳定、时好时坏？」（目标：成功率很不稳定...）。
+
+      输出要求：
+      1. 'prompt' 填入精简的「简体中文线索」。
+      2. 'answer' 填入目标词汇或句子的「简体中文」。
+      3. 'pinyin' 提供 'answer' 的拼音。
+      4. 'translation' 提供 'answer' 的英文翻译。
+      5. 'example_sentence_simplified' 使用 'answer' 造句。
+         
+      严格输出要求：
+      1. 仅输出一个 JSON 数组，禁止解释性文字或 Markdown 标签。
+      2. 提示语（prompt）要直观、好读，避免使用过于复杂的文法。
+      3. 确保 JSON 格式完全正确。
+
+      输入笔记内容：
+      {scraped_notes_output}
+      
+      ### START JSON ARRAY ###
+
+# 3) Add Cards to Anki
+add_cards_to_anki:
+  flashcards_data: flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Notes2Flash Basic Note Type"
+    front: "{prompt}"
+    back: "<b>{answer}</b><br>{pinyin}<br><br><i>{translation}</i><br><br>{example_sentence_simplified}"

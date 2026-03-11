@@ -1,0 +1,64 @@
+workflow_name: "Mandarin → Mandarin/Pinyin/Translation/Example (Traditional Only)"
+
+user_inputs: [notes_url, deckname]
+
+# 1) Scrape Notes
+scrape_notes:
+  - url: "{notes_url}"
+    output: scraped_notes_output
+
+# 2) Process Notes into Flashcards
+process_notes_to_cards:
+  - step: "Categorize and create multi-type cards"
+    model: "openrouter/free" # Choosing this model because its free, for more advanced processing you can look up on openrouter.com and choose a more powerful model, just make sure to update the model name here and ensure you have access to it with your API key.
+    chunk_size: 500
+    input:
+      - scraped_notes_output
+    attach_format_reminder: True
+    output: flashcards
+    output_fields:
+      - prompt      
+      - answer      
+      - pinyin      
+      - translation 
+      - example_sentence_traditional
+    prompt: |
+      你是一位資深的中文老師。你的任務是從提供的筆記中提取詞彙、短語和完整的句子，並將其轉化為「主動回憶」型閃卡。
+      請全程使用「繁體中文」。
+
+      編寫「prompt」的關鍵原則：
+      1. 簡短有力：提示語應盡可能精煉（建議 15 字以內），避免冗長的解釋。
+      2. 直接切入：直接描述場景、感覺或近義詞。
+      3. 排除關鍵字：絕對不能在 prompt 中出現 answer 裡的字。
+
+      類型示例：
+      - 基礎詞彙：描述用途或屬性。例如「早晨提神喝的黑色苦味飲料」（目標：咖啡）。
+      - 語義辨析：標註語氣差異。例如「『幫忙』的正式書面用語」（目標：支援）。
+      - 成語/短語：描述核心邏輯。例如「做事有頭無尾，缺乏耐性」（目標：虎頭蛇尾）。
+      - 完整句子：提煉核心情境。例如「如何形容水準不穩定、時好時壞？」（目標：成功率很不穩定...）。
+
+      輸出要求：
+      1. 'prompt' 填入精簡的「繁體中文線索」。
+      2. 'answer' 填入目標詞彙或句子的「繁體中文」。
+      3. 'pinyin' 提供 'answer' 的拼音。
+      4. 'translation' 提供 'answer' 的英文翻譯。
+      5. 'example_sentence_traditional' 使用 'answer' 造句。
+         
+      嚴格輸出要求：
+      1. 僅輸出一個 JSON 數組，禁止解釋性文字或 Markdown 標籤。
+      2. 提示語（prompt）要直觀、好讀，避免使用過於複雜的文法。
+      3. 確保 JSON 格式完全正確。
+
+      輸入筆記內容：
+      {scraped_notes_output}
+      
+      ### START JSON ARRAY ###
+
+# 3) Add Cards to Anki
+add_cards_to_anki:
+  flashcards_data: flashcards
+  deck_name: "{deckname}"
+  card_template:
+    template_name: "Notes2Flash Basic Note Type"
+    front: "{prompt}"
+    back: "<b>{answer}</b><br>{pinyin}<br><br><i>{translation}</i><br><br>{example_sentence_traditional}"

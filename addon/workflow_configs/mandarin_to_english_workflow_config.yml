@@ -1,4 +1,4 @@
-workflow_name: "Mandarin vocabulary extraction and flashcard (w/ pinyin) creation"
+workflow_name: "Mandarin → English/Pinyin/Example (Traditional & Simplified)"
 
 user_inputs: [notes_url, deckname]
 
