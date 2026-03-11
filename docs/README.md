@@ -41,14 +41,37 @@ AI-powered application to organize online notes (Google Doc, Notion, Obsidian) a
 ## Setting Up OpenRouter.ai Account (Required)
 
 1. Create an OpenRouter.ai account quickly using your Gmail or other means: [OpenRouter.ai](https://openrouter.ai/)
-2. Go to the "Keys" section and press "Create Key"
-3. Copy the generated key into the `config.json` of the notes2flash addon:
+2. **(Optional but recommended)** Go to your account **Privacy** settings and enable the **"Allow data usage"** toggle (see screenshot below). This is required for certain models - see the note below for details.
+3. Go to the "Keys" section and press "Create Key"
+4. Copy the generated key into the `config.json` of the notes2flash addon:
    - In Anki, navigate to Tools > Add-ons > Notes2Flash > Config
    - Paste the key into the value within quotes by `"openrouter_api_key"`
 
 **Note on Pricing**: You don't have to add any credit card details to use it but you'll be limited to free models which there are many to choose from such as `meta-llama/llama-3.1-70b-instruct:free`. Go to the openrouter.ai website to browse all possible models. To use paid models you have to do a minimum top-up of at least $5 USD, recommended for optimal performance. Using `openai/gpt-4o-mini` is a good performance/value model, processing 1 page (≈ 500 words ≈ 25 flashcards) costs approximately $0.0024.
 
 *Note: notes2flash has no affiliation with openrouter.ai, and no money is made by notes2flash*
+
+### ⚠️ Important: Privacy Settings for Certain Models
+
+Some models on OpenRouter require data sharing to be enabled in your privacy settings. If you encounter a **404 error** like:
+
+```
+404 Client Error: Not Found for url: https://openrouter.ai/api/v1/chat/completions
+```
+
+This typically means the model you're trying to use requires you to allow data usage in your OpenRouter privacy settings.
+
+**To fix this:**
+
+1. Go to your OpenRouter.ai account settings
+2. Navigate to the **Privacy** section
+3. Enable the **"Allow data usage"** toggle (see screenshot below)
+4. **Important**: After changing this setting, you must **create a new API key** for the change to take effect
+5. Update your notes2flash config with the new API key
+
+![OpenRouter Privacy Settings](openrouter-allow-data-usage.png)
+
+This setting allows certain models (typically those with stricter licensing) to process your requests. Models that require this setting will indicate so on the OpenRouter model browser.
 
 ## Platform-Specific Setup
 
@@ -191,8 +214,10 @@ add_cards_to_anki:
     back: "{answer}"  # the back of the card will show the answer
 ```
 
-## Workflow Example 3 - Prompt Chaining 
+## Workflow Example 3 - Prompt Chaining (Legacy/Not Recommended)
 The second stage `process_notes_to_cards` also allows prompt chaining via addition steps. See below for an example workflow that uses two steps/prompts to extract Mandarin vocabulary and then generate example sentences.
+
+> **⚠️ Note on Multi-step Workflows**: Multi-step workflows are now considered **largely redundant** due to how quickly AI models have advanced since this tool was first developed. Modern models are capable of handling complex tasks in a single step. Complex workflows that previously required chaining multiple prompts can now typically be accomplished with a single, well-crafted prompt to a more capable model. Multi-step workflows add unnecessary complexity and are **not recommended** for new configurations.
 
 ```yaml
 workflow_name: "Vocabulary Extraction and Multi-step Processing"
@@ -278,6 +303,16 @@ Only the final step needs to output the 'flashcards_data'-like format ie a list 
 - A common error is that the API is not formatting the output properly; it should be a list of dictionaries where each dictionary represents a flashcard with the fields specified in `output_fields`.
 - Feel free to delete `notes2flash.log` to reset the logging, and `tracked_docs.json` to reset document tracking.
 
+### 📋 Monitoring Large Document Processing
+
+When processing large documents, there is no progress bar in the UI. To verify that the addon is working correctly:
+
+1. Open the `notes2flash.log` file in the addon directory (typically `~/.local/share/Anki2/addons21/notes2flash/`)
+2. Watch for new log entries - you can use `tail -f notes2flash.log` (on Linux/Mac) or open the file periodically to check for updates
+3. The log will show API calls being made and content being processed
+
+This is particularly useful for confirming the addon hasn't frozen during long-running operations.
+
 ### 🚨 Troubleshooting Tips:
 1. Try using a different model. Some models may not handle large inputs or complex prompts effectively.
 2. Verify that the API output is correctly formatted as a list of dictionaries. Parsing errors often occur if the response structure is not as expected.
@@ -297,6 +332,24 @@ Only the final step needs to output the 'flashcards_data'-like format ie a list 
 - Ensure your prompts are explicit and clearly define the expected output format. (ChatGPT is great at writing prompts and editing configs.)
 - Test your workflows with various types of notes to ensure they work as expected.
 - Use descriptive names for your workflow files to easily identify their purpose.
+
+### ⚠️ Important: Avoid Square Brackets in Prompts
+
+**Do not use square brackets `[]` in your workflow prompt content.** The YAML parser may misinterpret square brackets as array syntax, causing parsing errors or unexpected behavior.
+
+**Incorrect:**
+```yaml
+prompt: |
+  Extract vocabulary [words and phrases] from the notes
+```
+
+**Correct:**
+```yaml
+prompt: |
+  Extract vocabulary (words and phrases) from the notes
+```
+
+Use parentheses `()` or other punctuation instead of square brackets in your prompt text.
 
 
 ## Error Handling
