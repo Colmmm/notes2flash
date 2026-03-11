@@ -10,7 +10,7 @@ scrape_notes:
 # 2) **Process Notes into Flashcards**
 process_notes_to_cards:
   - step: "Organize notes and create flashcards"
-    model: "meta-llama/llama-3.1-70b-instruct:free"
+    model: "openrouter/free" # Choosing this model because its free, for more advanced processing you can look up on openrouter.com and choose a more powerful model, just make sure to update the model name here and ensure you have access to it with your API key.
     chunk_size: 500  # Maximum chars per chunk (roughly 4 * token limit for english, 1*token_limit for mandarin)
     input:
       - scraped_notes_output  # Input is the notes content from scrape_notes stage

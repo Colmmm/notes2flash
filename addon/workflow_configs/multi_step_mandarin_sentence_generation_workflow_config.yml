@@ -10,7 +10,7 @@ scrape_notes:
 # 2) Process Notes to Extract Vocabulary and Generate Flashcards
 process_notes_to_cards:
   - step: "Extract vocabulary and phrases"
-    model: "meta-llama/llama-3.1-70b-instruct:free"
+    model: "openrouter/free" # Choosing this model because its free, for more advanced processing you can look up on openrouter.com and choose a more powerful model, just make sure to update the model name here and ensure you have access to it with your API key.
     chunk_size: 500
     input:
       - scraped_notes_output
